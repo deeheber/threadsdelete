@@ -109,16 +109,9 @@ class CategoryCounts:
     deferred: int = 0
 
 
-class QuotaStatus(StrEnum):
-    AVAILABLE = "available"
-    UNAVAILABLE = "unavailable"
-    NOT_CHECKED = "not checked"
-
-
 @dataclass
 class RunSummary:
     counts: dict[Category, CategoryCounts]
     discovery_complete: bool = True
-    quota_status: QuotaStatus = QuotaStatus.NOT_CHECKED
     auth_failed: bool = False
     notes: list[str] = field(default_factory=list)

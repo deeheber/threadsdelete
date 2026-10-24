@@ -357,7 +357,7 @@ class ThreadsClient:
 
     # -- quota and removal ---------------------------------------------------------
 
-    def get_quota(self, identity: Identity) -> Quota | None:
+    def get_quota(self, identity: Identity) -> Quota:
         """Remaining deletions from threads_publishing_limit (RESEARCH: Quota inspection)."""
         body = self._get(
             f"{identity.user_id}/threads_publishing_limit",

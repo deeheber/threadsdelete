@@ -102,7 +102,6 @@ class QuotaTests(unittest.TestCase):
             "GET", "1000001/threads_publishing_limit", json_response(load_fixture("quota.json"))
         )
         quota = make_client(fake).get_quota(OWNER)
-        assert quota is not None
         self.assertEqual(quota.remaining, {Operation.DELETE: 63})
         self.assertEqual(quota.window_description, "rolling 24 hours")
         request = fake.requests[0]
@@ -121,7 +120,6 @@ class QuotaTests(unittest.TestCase):
         fake = FakeThreadsApi()
         fake.add("GET", "1000001/threads_publishing_limit", json_response(over))
         quota = make_client(fake).get_quota(OWNER)
-        assert quota is not None
         self.assertEqual(quota.remaining[Operation.DELETE], 0)
         for body in (
             {},

@@ -192,7 +192,6 @@ class RemovalTests(unittest.TestCase):
         self.assertEqual(deletes(fake), ELIGIBLE_ORDER[:2])
         self.assertIn("Quota: unavailable", text)
         self.assertIn("MAX_DELETIONS_PER_RUN", text)
-        self.assertEqual(summary.quota_status.value, "unavailable")
 
     def test_item_failure_continues_and_is_counted(self) -> None:
         fake = fixture_api()

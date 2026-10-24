@@ -24,7 +24,6 @@ from threadsdelete.core import (
     CategoryCounts,
     ExitCode,
     Operation,
-    QuotaStatus,
     RunSummary,
     SelectionError,
     TimestampError,
@@ -110,7 +109,7 @@ def _summary_lines(summary: RunSummary) -> list[str]:
 
 
 def _check_quota(
-    client: ThreadsClient, identity: Identity, summary: RunSummary
+    client: ThreadsClient, identity: Identity
 ) -> tuple[Mapping[Operation, int | None], str]:
     """Quota inspection; any failure except auth falls back to the per-run cap."""
     try:
@@ -118,14 +117,10 @@ def _check_quota(
     except AuthError:
         raise
     except ApiError:
-        quota = None
-    if quota is None:
-        summary.quota_status = QuotaStatus.UNAVAILABLE
         return {}, (
             "Quota: unavailable \u2014 proceeding within MAX_DELETIONS_PER_RUN; "
             "the API's quota error stops removal"
         )
-    summary.quota_status = QuotaStatus.AVAILABLE
     remaining: dict[Operation, int | None] = dict(quota.remaining)
     detail = ", ".join(f"{op}: {n} remaining" for op, n in quota.remaining.items())
     return remaining, f"Quota: available ({detail}, {quota.window_description})"
@@ -190,7 +185,7 @@ def run(config: Config, client: ThreadsClient, run_started_at: datetime, out: Te
     quota_line = "Quota: not checked"
     remaining: Mapping[Operation, int | None] = {}
     if eligible:
-        remaining, quota_line = _check_quota(client, identity, summary)
+        remaining, quota_line = _check_quota(client, identity)
 
     allowed, deferred = split_by_budget(eligible, config.max_deletions_per_run, remaining)
     for candidate in eligible:
