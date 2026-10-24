@@ -22,6 +22,7 @@ from threadsdelete.core import (
     Candidate,
     Category,
     CategoryCounts,
+    ExitCode,
     Operation,
     QuotaStatus,
     RunSummary,
@@ -220,3 +221,14 @@ def run(config: Config, client: ThreadsClient, run_started_at: datetime, out: Te
     if auth_error is not None:
         raise auth_error
     return summary
+
+
+def exit_status(summary: RunSummary) -> ExitCode:
+    """AUTH on auth loss; FAILURE on incomplete discovery or failed/unknown removals."""
+    if summary.auth_failed:
+        return ExitCode.AUTH
+    if not summary.discovery_complete:
+        return ExitCode.FAILURE
+    if any(c.failed > 0 or c.unknown_outcome > 0 for c in summary.counts.values()):
+        return ExitCode.FAILURE
+    return ExitCode.OK

@@ -87,10 +87,6 @@ def main(
             print(f"Configuration error: {problem}", file=err)
         return ExitCode.CONFIG
 
-    if not cfg.dry_run:
-        print("Removal is not available in this build yet; set DRY_RUN=true.", file=err)
-        return ExitCode.CONFIG
-
     secrets = (cfg.access_token,)
     handler, previous_level = _configure_logging(cfg.log_level, cfg.access_token, err)
     try:
@@ -100,7 +96,7 @@ def main(
             timeout_seconds=cfg.http_timeout_seconds,
             max_read_retries=cfg.max_read_retries,
             max_retry_wait_seconds=cfg.max_retry_wait_seconds,
-            read_only=True,
+            read_only=cfg.dry_run,
             transport=transport,
         )
         with client:
@@ -112,7 +108,7 @@ def main(
             except (ApiError, SelectionError, TimestampError) as exc:
                 print(f"Error: {redact(str(exc), secrets)}", file=err)
                 return ExitCode.FAILURE
-        return ExitCode.OK if summary.discovery_complete else ExitCode.FAILURE
+        return cleanup.exit_status(summary)
     finally:
         logging.getLogger().removeHandler(handler)
         logging.getLogger().setLevel(previous_level)

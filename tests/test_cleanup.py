@@ -17,7 +17,14 @@ from threadsdelete import cleanup
 from threadsdelete.api import AuthError, ThreadsClient
 from threadsdelete.cleanup import IdentityMismatchError, split_by_budget
 from threadsdelete.config import load_config
-from threadsdelete.core import Candidate, Category, Operation
+from threadsdelete.core import (
+    Candidate,
+    Category,
+    CategoryCounts,
+    ExitCode,
+    Operation,
+    RunSummary,
+)
 
 RUN_START = datetime(2026, 10, 23, 5, 0, 0, tzinfo=UTC)
 CONFIG = load_config({"THREADS_ACCESS_TOKEN": "fake-token-value", "THREADS_USER_ID": "1000001"})
@@ -271,6 +278,36 @@ class RemovalTests(unittest.TestCase):
         for category, c in dry.counts.items():
             self.assertEqual(c.eligible, c.would_remove + c.deferred, category)
         self.assertEqual(sum(c.would_remove for c in dry.counts.values()), 2)
+
+
+class ExitStatusTests(unittest.TestCase):
+    def summary(self, **changes: object) -> RunSummary:
+        summary = RunSummary(
+            counts={Category.POST: CategoryCounts(), Category.REPLY: CategoryCounts()}
+        )
+        for key, value in changes.items():
+            setattr(summary, key, value)
+        return summary
+
+    def test_exit_status_matrix(self) -> None:
+        ok = self.summary()
+        self.assertEqual(cleanup.exit_status(ok), ExitCode.OK)  # nothing eligible
+        deferred = self.summary()
+        deferred.counts[Category.POST].eligible = 3
+        deferred.counts[Category.POST].deferred = 3
+        self.assertEqual(cleanup.exit_status(deferred), ExitCode.OK)
+        failed = self.summary()
+        failed.counts[Category.REPLY].failed = 1
+        self.assertEqual(cleanup.exit_status(failed), ExitCode.FAILURE)
+        unknown = self.summary()
+        unknown.counts[Category.POST].unknown_outcome = 1
+        self.assertEqual(cleanup.exit_status(unknown), ExitCode.FAILURE)
+        self.assertEqual(
+            cleanup.exit_status(self.summary(discovery_complete=False)), ExitCode.FAILURE
+        )
+        self.assertEqual(cleanup.exit_status(self.summary(auth_failed=True)), ExitCode.AUTH)
+        both = self.summary(auth_failed=True, discovery_complete=False)
+        self.assertEqual(cleanup.exit_status(both), ExitCode.AUTH)
 
 
 class SplitByBudgetTests(unittest.TestCase):

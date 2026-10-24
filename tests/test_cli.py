@@ -5,8 +5,10 @@ import unittest
 from datetime import UTC, datetime
 from unittest import mock
 
+import httpx
+
 import main
-from tests.fakes import FakeThreadsApi, fixture_api, json_response, load_fixture
+from tests.fakes import FakeThreadsApi, error_response, fixture_api, json_response, load_fixture
 
 TOKEN = "fake-token-value-for-cli"
 RUN_START = datetime(2026, 10, 23, 5, 0, 0, tzinfo=UTC)
@@ -93,6 +95,61 @@ class CliPreviewTests(unittest.TestCase):
         code, out, err = run_main(fake, {**ENV, "LOG_LEVEL": "DEBUG"})
         self.assertEqual(code, 3)
         self.assertNotIn(TOKEN, out + err)
+
+
+REMOVE_ENV = {**ENV, "DRY_RUN": "false"}
+
+
+class CliRemovalTests(unittest.TestCase):
+    def test_removal_run_with_partial_failure_exits_1(self) -> None:
+        fake = fixture_api()
+        ok = json_response({"success": True})
+        fake.add("DELETE", "9000001", ok)
+        fake.add("DELETE", "7000001", error_response(100, 400))
+        for item in ("9000002", "9000003", "9000004"):
+            fake.add("DELETE", item, ok)
+        code, out, _ = run_main(fake, REMOVE_ENV)
+        self.assertEqual(code, 1)
+        self.assertIn("Mode: REMOVAL", out)
+        self.assertIn("removed  post  9000001", out)
+        self.assertIn("failed  reply  7000001", out)
+        self.assertIn("reply: scanned=2 eligible=1 would_remove=1 removed=0 failed=1", out)
+
+    def test_removal_unknown_outcome_exits_1_and_is_not_reported_removed(self) -> None:
+        fake = fixture_api()
+        fake.add("DELETE", "9000001", httpx.ReadTimeout("slow"), repeat=True)
+        code, out, _ = run_main(fake, REMOVE_ENV)
+        self.assertEqual(code, 1)
+        self.assertEqual(fake.paths("DELETE"), ["9000001"])
+        self.assertNotIn("removed  post", out)
+        self.assertIn("unknown  post  9000001", out)
+        self.assertIn("will rediscover next run", out)
+
+    def test_cap_deferral_exits_0(self) -> None:
+        fake = fixture_api()
+        ok = json_response({"success": True})
+        fake.add("DELETE", "9000001", ok)
+        code, out, _ = run_main(fake, {**REMOVE_ENV, "MAX_DELETIONS_PER_RUN": "1"})
+        self.assertEqual(code, 0)
+        self.assertEqual(fake.paths("DELETE"), ["9000001"])
+        self.assertIn("deferred  reply  7000001", out)
+
+    def test_auth_loss_during_removal_exits_3_and_redacts_token(self) -> None:
+        fake = fixture_api()
+        body = {"error": {"message": f"token {TOKEN} expired", "code": 190}}
+        fake.add("DELETE", "9000001", json_response(body, 401))
+        code, out, err = run_main(fake, {**REMOVE_ENV, "LOG_LEVEL": "DEBUG"})
+        self.assertEqual(code, 3)
+        self.assertNotIn(TOKEN, out + err)
+        self.assertIn("=== Summary ===", out)
+        self.assertEqual(fake.paths("DELETE"), ["9000001"])
+
+    def test_nothing_eligible_exits_0_without_mutation(self) -> None:
+        fake = fixture_api(quota=False)
+        code, out, _ = run_main(fake, {**REMOVE_ENV, "DAYS_AGO": "36500"})
+        self.assertEqual(code, 0)
+        self.assertEqual({r.method for r in fake.requests}, {"GET"})
+        self.assertIn("Quota: not checked", out)
 
 
 if __name__ == "__main__":
