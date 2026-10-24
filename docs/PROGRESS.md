@@ -15,7 +15,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-04 API client transport, pagination, retries and redaction
 - [x] P2-05 Category discovery and record validation
 - [x] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
-- [ ] P2-07 Cleanup preview: identity, complete discovery, selection and report
+- [x] P2-07 Cleanup preview: identity, complete discovery, selection and report
 - [ ] P2-08 Entry point, logging and local wrapper
 - [ ] P2-09 Phase 2 close — push and manual checks
 - [ ] P3-01 API removal and quota inspection
@@ -76,3 +76,7 @@ discover(category, identity)->(candidates, scanned) added to ThreadsClient. SUPP
 tests/test_budgets.py: measure_read_chain, report(), 2 tests (JOB_TIMEOUT_MINUTES_ASSUMED=15 in module; P3-04 extends this file, P4-03 should read the YAML value).
 Measurement: HTTP_TIMEOUT_SECONDS/MAX_READ_RETRIES/MAX_RETRY_WAIT_SECONDS before=30/3/60 (4 attempts, 7s sleep, 127s worst case/chain) after=same decision=kept because 127s << 900s job timeout (retries 5: 211s; timeout 60: 247s; Retry-After at 60s cap: 300s).
 Live measurement: pending (human)
+
+### P2-07 — 605c515
+
+cleanup.py: IdentityMismatchError, verify_identity, Discovery, discover_all, split_by_budget, run (dry only), SUMMARY_HEADER. 6 tests. Interpretation: summary has lines only for SUPPORTED_CATEGORIES; SelectionError -> incomplete discovery; run() raises ValueError for dry_run False (P3-02 replaces). Helpers _candidate_line/_summary_lines/_stamp are reusable for P3-02. Test helpers in test_cleanup: full_fake(), preview(fake, cap). Fixture scenario at RUN_START 2026-10-23, 90 days: 5 eligible (9000001, 7000001, 9000002, 9000003, 9000004).
