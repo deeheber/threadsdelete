@@ -10,7 +10,7 @@ from typing import Self
 
 import httpx
 
-from threadsdelete.core import Candidate, Category, parse_timestamp
+from threadsdelete.core import Candidate, Category, Operation, parse_timestamp
 
 API_HOST = "graph.threads.com"
 Transport = httpx.BaseTransport
@@ -81,6 +81,12 @@ class OwnershipError(ApiError):
 class Identity:
     user_id: str
     username: str
+
+
+@dataclass(frozen=True)
+class Quota:
+    remaining: dict[Operation, int]
+    window_description: str
 
 
 def redact(text: str, secrets: Iterable[str]) -> str:
@@ -348,3 +354,75 @@ class ThreadsClient:
             action_at=parse_timestamp(record.get("timestamp")),
             permalink=permalink if isinstance(permalink, str) and permalink else None,
         )
+
+    # -- quota and removal ---------------------------------------------------------
+
+    def get_quota(self, identity: Identity) -> Quota | None:
+        """Remaining deletions from threads_publishing_limit (RESEARCH: Quota inspection)."""
+        body = self._get(
+            f"{identity.user_id}/threads_publishing_limit",
+            {"fields": "delete_quota_usage,delete_config"},
+        )
+        data = body.get("data")
+        entry = data[0] if isinstance(data, list) and data else None
+        if not isinstance(entry, dict):
+            raise self._fail(ResponseError, "quota response has no data entry")
+        usage = entry.get("delete_quota_usage")
+        config = entry.get("delete_config")
+        total = config.get("quota_total") if isinstance(config, dict) else None
+        duration = config.get("quota_duration") if isinstance(config, dict) else None
+        if not (_is_count(usage) and _is_count(total) and _is_count(duration) and duration):
+            raise self._fail(ResponseError, "quota response fields are missing or malformed")
+        assert isinstance(usage, int) and isinstance(total, int) and isinstance(duration, int)
+        hours, rest = divmod(duration, 3600)
+        window = f"rolling {hours} hours" if hours and not rest else f"rolling {duration} seconds"
+        return Quota(remaining={Operation.DELETE: max(total - usage, 0)}, window_description=window)
+
+    def remove(self, candidate: Candidate) -> None:
+        """One DELETE attempt, never retried. Returns only on a validated success body."""
+        if candidate.operation is not Operation.DELETE:
+            raise ValueError(f"unsupported operation: {candidate.operation}")
+        try:
+            response = self._send("DELETE", candidate.target_id, {})
+        except httpx.TimeoutException, httpx.TransportError:
+            raise self._fail(
+                UnknownOutcomeError, "removal request failed; outcome unknown"
+            ) from None
+        except httpx.HTTPError:
+            raise self._fail(
+                UnknownOutcomeError, "removal request not completed; outcome unknown"
+            ) from None
+        if response.is_success:
+            self._check_removal_body(response, candidate.target_id)
+            return
+        error = self._classify(response)
+        if isinstance(error, (AuthError, QuotaExceededError)):
+            raise error
+        if response.status_code < 500 and _is_error_body(response):
+            raise self._fail(ItemError, f"removal rejected ({error})")
+        raise self._fail(UnknownOutcomeError, f"removal outcome unknown ({error})")
+
+    def _check_removal_body(self, response: httpx.Response, target_id: str) -> None:
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict) or not isinstance(body.get("success"), bool):
+            raise self._fail(UnknownOutcomeError, "removal response body not recognised")
+        if body["success"] is False:
+            raise self._fail(ItemError, "removal reported success: false")
+        deleted = body.get("deleted_id")
+        if deleted is not None and deleted != target_id:
+            raise self._fail(UnknownOutcomeError, "removal response names a different item")
+
+
+def _is_count(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _is_error_body(response: httpx.Response) -> bool:
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    return isinstance(body, dict) and isinstance(body.get("error"), dict)
