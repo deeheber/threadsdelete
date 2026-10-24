@@ -13,7 +13,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-02 Configuration parsing and .env.sample
 - [x] P2-03 Core candidate types, timestamps and eligibility
 - [x] P2-04 API client transport, pagination, retries and redaction
-- [ ] P2-05 Category discovery and record validation
+- [x] P2-05 Category discovery and record validation
 - [ ] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
 - [ ] P2-07 Cleanup preview: identity, complete discovery, selection and report
 - [ ] P2-08 Entry point, logging and local wrapper
@@ -66,3 +66,7 @@ core.py done, 8 tests. Interpretation: conflicting duplicate action times raise 
 ### P2-04 — a968d76
 
 api.py read side + fakes + 14 tests. Interpretation: token as access_token query param (RESEARCH); API_HOST graph.threads.com; ThreadsClient._send(method, path, params) is the single request primitive (read-only guard lives there) and _get(path, params) does bounded retry; _classify(response) maps status/codes (reuse for removal in P3-01: 401/403/auth codes->AuthError, 429/codes 4,17,341->QuotaExceededError, else ResponseError); _fail(kind,msg) redacts. Backoff min(2**attempt,max) from attempt 0. FakeThreadsApi: add(method,path,*replies,repeat=), .requests, .sleeps, .calls(), .paths(), json_response, error_response(code,status) helpers; make_client(fake, **overrides) read_only=True default, sleep=fake.sleeps.append. Paths keyed without version prefix (e.g. "me/threads"). Warning logs on retries print to stderr during tests (harmless).
+
+### P2-05 — bc8522e
+
+discover(category, identity)->(candidates, scanned) added to ThreadsClient. SUPPORTED_CATEGORIES=(POST,QUOTE,REPLY); UNSUPPORTED={REPOST,LIKE} with reasons. Interpretation: reposts unsupported per RESEARCH so no repost-action-time test; REPOST_FACADE counted in POST's scanned, not returned, no ownership check; /me/threads fetched once and cached per client (POST+QUOTE share it); missing media_type aborts (ResponseError); replies: is_reply_owned_by_me True + username==identity.username else OwnershipError; TimestampError propagates. Fixtures: threads_page1.json, threads_page2.json (A1 cursor, 6 records), replies.json (2 replies); identity example_owner/1000001. Dedicated limit=100 params.
