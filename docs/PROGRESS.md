@@ -29,7 +29,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P4-04 README
 - [x] P4-05 Meta setup and token maintenance guide
 - [x] P4-06 Final offline checks, push and handoff checks
-- [ ] R1-01 Test main.py dry-run read-only wiring, log redaction layers and generic API error exit
+- [x] R1-01 Test main.py dry-run read-only wiring, log redaction layers and generic API error exit
 - [ ] R1-02 Test that a conflicting duplicate marks the run's discovery incomplete
 
 ## Log
@@ -142,3 +142,7 @@ docs/META_SETUP.md written (dated 2026-10-23, live steps pending). Headings: reg
 Completed offline checks (all exit 0): uv sync --locked; mypy threadsdelete main.py; ruff check .; ruff format --check .; unittest discover (95 tests OK); compileall; main.py --help. Workflow/CLI default consistency covered by tests/test_workflows.py and test_env_sample_matches_config. Push: ok.
 Pending live validation: 1. Follow README.md from a fresh checkout. 2. Configure Secrets/Variables and run an owner-authorized `workflow_dispatch` preview (`dry_run=true`); inspect the job summary. 3. Owner sets `DRY_RUN=false` to enable real scheduled cleanup. 4. Live items from docs/RESEARCH.md § Untested and pending.
 Manual check: NOT VERIFIED (human)
+
+### R1-01 — 0385198
+
+Added CliSafetyWiringTests (5 tests) in tests/test_cli.py. Manually mutated main.py for read_only, handler filter, httpx pin, generic ApiError exit: each fails tests. main.py unchanged. Dry-run block surfaces as exit 1 via ApiError mapping.
