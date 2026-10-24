@@ -26,7 +26,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P4-01 Offline CI workflow
 - [x] P4-02 Scheduled cleanup workflow
 - [x] P4-03 Tune the cleanup job timeout-minutes
-- [ ] P4-04 README
+- [x] P4-04 README
 - [ ] P4-05 Meta setup and token maintenance guide
 - [ ] P4-06 Final offline checks, push and handoff checks
 
@@ -126,3 +126,7 @@ cleanup-feed.yml + test_workflows.py (93 tests total). Interpretation: PYTHONUNB
 job_timeout_minutes() reads cleanup-feed.yml; JobTimeoutTests added (95 tests).
 Measurement: timeout-minutes before=15 after=15 decision=kept because read chain 127s; identity+quota+3 requests at full chain = 635s < 900s; worst-case covers 7 requests (5 pages); removal bound cap x timeout 3000s only if every delete hits the timeout. A killed job is safe: discovery completes before mutation, removals are single independent requests, unknown outcomes are rediscovered.
 Live measurement: pending (human) - record the real duration of the first owner-authorized Actions preview
+
+### P4-04 — 72efa7e
+
+README.md written (all SPEC section 7 commands incl. literal {filter} row; both GitHub URLs; no token-like strings). Links docs/META_SETUP.md (P4-05). States reposts/likes excluded, nothing live-verified, no undo, manual token maintenance, local runs uncoordinated with Actions.
