@@ -27,7 +27,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P4-02 Scheduled cleanup workflow
 - [x] P4-03 Tune the cleanup job timeout-minutes
 - [x] P4-04 README
-- [ ] P4-05 Meta setup and token maintenance guide
+- [x] P4-05 Meta setup and token maintenance guide
 - [ ] P4-06 Final offline checks, push and handoff checks
 
 ## Log
@@ -130,3 +130,7 @@ Live measurement: pending (human) - record the real duration of the first owner-
 ### P4-04 — 72efa7e
 
 README.md written (all SPEC section 7 commands incl. literal {filter} row; both GitHub URLs; no token-like strings). Links docs/META_SETUP.md (P4-05). States reposts/likes excluded, nothing live-verified, no undo, manual token maintenance, local runs uncoordinated with Actions.
+
+### P4-05 — 1bb335a
+
+docs/META_SETUP.md written (dated 2026-10-23, live steps pending). Headings: registration, app and use case, testers, permissions, token acquisition and exchange, account ID, store, expiry and manual renewal, revocation, unverified items. Curl exchange/refresh with placeholders only. Unverified items flagged: threads_delete in scope, redirect URI behaviour, revocation endpoint.
