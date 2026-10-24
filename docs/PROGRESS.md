@@ -9,7 +9,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P1-02 Research content categories, removal, quota and payload contracts
 - [x] P1-03 Decide go or no-go
 - [x] P1-04 Phase 1 close — push and manual checks
-- [ ] P2-01 Project scaffold
+- [x] P2-01 Project scaffold
 - [ ] P2-02 Configuration parsing and .env.sample
 - [ ] P2-03 Core candidate types, timestamps and eligibility
 - [ ] P2-04 API client transport, pagination, retries and redaction
@@ -50,3 +50,7 @@ Decision: GO (criteria a-d all yes, doc-only). Unsupported categories reposts an
 
 Push: ok (origin build/2026-10-24). Owner reads docs/RESEARCH.md and confirms it explains whether personal cleanup is free of API fees, what works, what is unsupported, and what remains untested.
 Manual check: NOT VERIFIED (human)
+
+### P2-01 — 33c9852
+
+Scaffold done; tests: HelpTests.test_help_needs_no_credentials. Note: `unittest discover -s tests` imports modules top-level (tests/__init__ not loaded unless a test imports tests.fakes), as the plan anticipates. ruff/mypy strict green. .gitignore preserved existing .kukulu/implement.lock line.
