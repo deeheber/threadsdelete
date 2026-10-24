@@ -21,7 +21,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P3-01 API removal and quota inspection
 - [x] P3-02 Sequential removal with quota budget
 - [x] P3-03 Exit statuses and removal mode in the entry point
-- [ ] P3-04 Tune MAX_DELETIONS_PER_RUN
+- [x] P3-04 Tune MAX_DELETIONS_PER_RUN
 - [ ] P3-05 Phase 3 close — push and manual checks
 - [ ] P4-01 Offline CI workflow
 - [ ] P4-02 Scheduled cleanup workflow
@@ -101,3 +101,9 @@ cleanup.run now handles dry and real runs (_check_quota, _remove_all). 9 new tes
 ### P3-03 — f07e7a5
 
 cleanup.exit_status added; main.py builds ThreadsClient(read_only=cfg.dry_run) and returns exit_status(summary); removal-not-available branch removed. Tests: exit status matrix + 5 CLI removal tests (82 total passing). No interpretation changes.
+
+### P3-04 — bbbec5b
+
+simulate_weekly_drain + report extension + CapBudgetTests (86 tests total). DOCUMENTED_DELETE_QUOTA=100 (RESEARCH, Quota inspection).
+Measurement: MAX_DELETIONS_PER_RUN before=100 after=100 decision=kept because RESEARCH documents 100/rolling 24h; backlog 500 drains in 5 runs, 5000 in 50 at cap 100; cap>100 with known quota drains no faster, cap 50 doubles time.
+Live measurement: pending (human)
