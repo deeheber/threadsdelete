@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from unittest import mock
 
 import main
-from tests.fakes import FakeThreadsApi, json_response, load_fixture
+from tests.fakes import FakeThreadsApi, fixture_api, json_response, load_fixture
 
 TOKEN = "fake-token-value-for-cli"
 RUN_START = datetime(2026, 10, 23, 5, 0, 0, tzinfo=UTC)
@@ -28,19 +28,6 @@ class HelpTests(unittest.TestCase):
         self.assertIn("MAX_DELETIONS_PER_RUN", out.getvalue())
 
 
-def fixture_fake() -> FakeThreadsApi:
-    fake = FakeThreadsApi()
-    fake.add("GET", "me", json_response(load_fixture("me.json")))
-    fake.add(
-        "GET",
-        "me/threads",
-        json_response(load_fixture("threads_page1.json")),
-        json_response(load_fixture("threads_page2.json")),
-    )
-    fake.add("GET", "me/replies", json_response(load_fixture("replies.json")))
-    return fake
-
-
 def run_main(fake: FakeThreadsApi, env: dict[str, str] | None = None) -> tuple[int, str, str]:
     out, err = io.StringIO(), io.StringIO()
     code = main.main(
@@ -56,21 +43,21 @@ def run_main(fake: FakeThreadsApi, env: dict[str, str] | None = None) -> tuple[i
 
 class CliPreviewTests(unittest.TestCase):
     def test_preview_with_fake_transport_exits_zero(self) -> None:
-        code, out, _ = run_main(fixture_fake(), {**ENV, "DRY_RUN": "true"})
+        code, out, _ = run_main(fixture_api(), {**ENV, "DRY_RUN": "true"})
         self.assertEqual(code, 0)
         self.assertIn("Mode: DRY RUN", out)
         self.assertIn("=== Summary ===", out)
         self.assertIn("would remove  post  9000001", out)
 
     def test_missing_dry_run_defaults_to_preview(self) -> None:
-        fake = fixture_fake()
+        fake = fixture_api()
         code, out, _ = run_main(fake)
         self.assertEqual(code, 0)
         self.assertIn("Mode: DRY RUN", out)
         self.assertEqual({r.method for r in fake.requests}, {"GET"})
 
     def test_invalid_config_exits_2_without_network(self) -> None:
-        fake = fixture_fake()
+        fake = fixture_api()
         code, out, err = run_main(fake, {**ENV, "DAYS_AGO": "-3", "DRY_RUN": "maybe"})
         self.assertEqual(code, 2)
         self.assertEqual(fake.requests, [])
@@ -95,7 +82,7 @@ class CliPreviewTests(unittest.TestCase):
         self.assertIn("Discovery: INCOMPLETE", out)
 
     def test_token_never_printed(self) -> None:
-        fake = fixture_fake()
+        fake = fixture_api()
         code, out, err = run_main(fake, {**ENV, "LOG_LEVEL": "DEBUG"})
         self.assertEqual(code, 0)
         self.assertNotIn(TOKEN, out + err)

@@ -82,3 +82,21 @@ def make_client(fake: FakeThreadsApi, **overrides: Any) -> ThreadsClient:
     }
     settings.update(overrides)
     return ThreadsClient(**settings)
+
+
+def fixture_api(quota: bool = True) -> FakeThreadsApi:
+    """Account example_owner with the synthetic fixtures: 5 eligible items at 90 days."""
+    fake = FakeThreadsApi()
+    fake.add("GET", "me", json_response(load_fixture("me.json")))
+    fake.add(
+        "GET",
+        "me/threads",
+        json_response(load_fixture("threads_page1.json")),
+        json_response(load_fixture("threads_page2.json")),
+    )
+    fake.add("GET", "me/replies", json_response(load_fixture("replies.json")))
+    if quota:
+        fake.add(
+            "GET", "1000001/threads_publishing_limit", json_response(load_fixture("quota.json"))
+        )
+    return fake

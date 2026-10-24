@@ -11,8 +11,11 @@ from threadsdelete.api import (
     ApiError,
     AuthError,
     Identity,
+    ItemError,
     OwnershipError,
+    QuotaExceededError,
     ThreadsClient,
+    UnknownOutcomeError,
 )
 from threadsdelete.config import Config
 from threadsdelete.core import (
@@ -105,17 +108,68 @@ def _summary_lines(summary: RunSummary) -> list[str]:
     return lines
 
 
+def _check_quota(
+    client: ThreadsClient, identity: Identity, summary: RunSummary
+) -> tuple[Mapping[Operation, int | None], str]:
+    """Quota inspection; any failure except auth falls back to the per-run cap."""
+    try:
+        quota = client.get_quota(identity)
+    except AuthError:
+        raise
+    except ApiError:
+        quota = None
+    if quota is None:
+        summary.quota_status = QuotaStatus.UNAVAILABLE
+        return {}, (
+            "Quota: unavailable \u2014 proceeding within MAX_DELETIONS_PER_RUN; "
+            "the API's quota error stops removal"
+        )
+    summary.quota_status = QuotaStatus.AVAILABLE
+    remaining: dict[Operation, int | None] = dict(quota.remaining)
+    detail = ", ".join(f"{op}: {n} remaining" for op, n in quota.remaining.items())
+    return remaining, f"Quota: available ({detail}, {quota.window_description})"
+
+
+def _remove_all(
+    client: ThreadsClient, allowed: list[Candidate], summary: RunSummary, out: TextIO
+) -> tuple[list[Candidate], AuthError | None]:
+    """Sequential removal. Returns candidates left unattempted and any auth failure."""
+    for index, candidate in enumerate(allowed):
+        counts = summary.counts[candidate.category]
+        left = allowed[index + 1 :]
+        try:
+            client.remove(candidate)
+        except ItemError as exc:
+            counts.failed += 1
+            print(_candidate_line("failed", candidate) + f"  ({exc})", file=out)
+        except QuotaExceededError as exc:
+            summary.notes.append(f"stopped: quota or rate limit reached ({exc})")
+            return allowed[index:], None
+        except UnknownOutcomeError as exc:
+            counts.unknown_outcome += 1
+            print(_candidate_line("unknown", candidate) + f"  ({exc})", file=out)
+            summary.notes.append("stopped after unknown outcome; will rediscover next run")
+            return left, None
+        except AuthError as exc:
+            summary.auth_failed = True
+            summary.notes.append("stopped: authentication or permission failure")
+            return allowed[index:], exc
+        else:
+            counts.removed += 1
+            print(_candidate_line("removed", candidate), file=out)
+    return [], None
+
+
 def run(config: Config, client: ThreadsClient, run_started_at: datetime, out: TextIO) -> RunSummary:
-    """Preview flow (dry run). Raises AuthError / IdentityMismatchError for the caller."""
-    if not config.dry_run:
-        raise ValueError("removal mode is not implemented in this build")
+    """Preview (dry run) or sequential removal. Raises AuthError / IdentityMismatchError."""
     identity = verify_identity(client, config.user_id)
     cutoff = compute_cutoff(run_started_at, config.days_ago)
     print(f"Account: @{identity.username} ({identity.user_id})", file=out)
     print(f"Cutoff (UTC): {_stamp(cutoff)}", file=out)
-    print("Mode: DRY RUN (no changes will be made)", file=out)
+    mode = "DRY RUN (no changes will be made)" if config.dry_run else "REMOVAL"
+    print(f"Mode: {mode}", file=out)
     for category, reason in UNSUPPORTED_CATEGORIES.items():
-        print(f"Excluded: {category} — {reason}", file=out)
+        print(f"Excluded: {category} \u2014 {reason}", file=out)
 
     summary = RunSummary(counts={c: CategoryCounts() for c in SUPPORTED_CATEGORIES})
     discovery = discover_all(client, identity)
@@ -130,15 +184,26 @@ def run(config: Config, client: ThreadsClient, run_started_at: datetime, out: Te
         except SelectionError as exc:
             discovery.complete = False
             problem = str(exc)
-            eligible = []
     summary.discovery_complete = discovery.complete
 
-    allowed, deferred = split_by_budget(eligible, config.max_deletions_per_run, {})
+    quota_line = "Quota: not checked"
+    remaining: Mapping[Operation, int | None] = {}
+    if eligible:
+        remaining, quota_line = _check_quota(client, identity, summary)
+
+    allowed, deferred = split_by_budget(eligible, config.max_deletions_per_run, remaining)
     for candidate in eligible:
         summary.counts[candidate.category].eligible += 1
     for candidate in allowed:
         summary.counts[candidate.category].would_remove += 1
-        print(_candidate_line("would remove", candidate), file=out)
+
+    auth_error: AuthError | None = None
+    if config.dry_run:
+        for candidate in allowed:
+            print(_candidate_line("would remove", candidate), file=out)
+    else:
+        unattempted, auth_error = _remove_all(client, allowed, summary, out)
+        deferred = unattempted + deferred
     for candidate in deferred:
         summary.counts[candidate.category].deferred += 1
         print(_candidate_line("deferred", candidate), file=out)
@@ -148,9 +213,10 @@ def run(config: Config, client: ThreadsClient, run_started_at: datetime, out: Te
     if summary.discovery_complete:
         print("Discovery: complete", file=out)
     else:
-        print(f"Discovery: INCOMPLETE — {problem} (no changes made)", file=out)
-    summary.quota_status = QuotaStatus.NOT_CHECKED
-    print("Quota: not checked", file=out)
+        print(f"Discovery: INCOMPLETE \u2014 {problem} (no changes made)", file=out)
+    print(quota_line, file=out)
     for note in summary.notes:
         print(f"Note: {note}", file=out)
+    if auth_error is not None:
+        raise auth_error
     return summary
