@@ -11,7 +11,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P1-04 Phase 1 close — push and manual checks
 - [x] P2-01 Project scaffold
 - [x] P2-02 Configuration parsing and .env.sample
-- [ ] P2-03 Core candidate types, timestamps and eligibility
+- [x] P2-03 Core candidate types, timestamps and eligibility
 - [ ] P2-04 API client transport, pagination, retries and redaction
 - [ ] P2-05 Category discovery and record validation
 - [ ] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
@@ -58,3 +58,7 @@ Scaffold done; tests: HelpTests.test_help_needs_no_credentials. Note: `unittest 
 ### P2-02 — c688aa6
 
 config.py + .env.sample + 8 tests. Interpretation: error messages never echo any value; DEFAULT_API_VERSION="v1.0"; THREADS_USER_ID validated with the digits pattern. Config keys: all ten ENV_KEYS (SPEC's nine listed + THREADS_API_VERSION counted; tuple has 10 names incl. all SPEC rows). Note: constraint no-environ-in-package matches the literal text "os.environ" even in docstrings.
+
+### P2-03 — 51d34cf
+
+core.py done, 8 tests. Interpretation: conflicting duplicate action times raise SelectionError before eligibility filtering. parse_timestamp uses datetime.fromisoformat (py3.14 accepts +0000 and Z); date-only/naive rejected. Types per CLAUDE.md map, RunSummary.notes is default_factory list.
