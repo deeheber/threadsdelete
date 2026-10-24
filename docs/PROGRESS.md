@@ -22,7 +22,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P3-02 Sequential removal with quota budget
 - [x] P3-03 Exit statuses and removal mode in the entry point
 - [x] P3-04 Tune MAX_DELETIONS_PER_RUN
-- [ ] P3-05 Phase 3 close — push and manual checks
+- [x] P3-05 Phase 3 close — push and manual checks
 - [ ] P4-01 Offline CI workflow
 - [ ] P4-02 Scheduled cleanup workflow
 - [ ] P4-03 Tune the cleanup job timeout-minutes
@@ -107,3 +107,8 @@ cleanup.exit_status added; main.py builds ThreadsClient(read_only=cfg.dry_run) a
 simulate_weekly_drain + report extension + CapBudgetTests (86 tests total). DOCUMENTED_DELETE_QUOTA=100 (RESEARCH, Quota inspection).
 Measurement: MAX_DELETIONS_PER_RUN before=100 after=100 decision=kept because RESEARCH documents 100/rolling 24h; backlog 500 drains in 5 runs, 5000 in 50 at cap 100; cap>100 with known quota drains no faster, cap 50 doubles time.
 Live measurement: pending (human)
+
+### P3-05 — 1965e46
+
+Push: ok. After the owner authorizes specific disposable test posts: set DAYS_AGO so only they are eligible, run `DRY_RUN=true ./scripts/run.sh` and confirm the preview lists exactly them, run `DRY_RUN=false ./scripts/run.sh`, confirm they are gone in Threads and the exit status is 0. Until authorized, this check is pending.
+Manual check: NOT VERIFIED (human)
