@@ -1,14 +1,17 @@
 import contextlib
 import io
+import logging
 import os
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest import mock
 
 import httpx
 
 import main
 from tests.fakes import FakeThreadsApi, error_response, fixture_api, json_response, load_fixture
+from threadsdelete.api import ApiError, MutationBlockedError
+from threadsdelete.core import Candidate, Category
 
 TOKEN = "fake-token-value-for-cli"
 RUN_START = datetime(2026, 10, 23, 5, 0, 0, tzinfo=UTC)
@@ -150,6 +153,63 @@ class CliRemovalTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual({r.method for r in fake.requests}, {"GET"})
         self.assertIn("Quota: not checked", out)
+
+
+class CliSafetyWiringTests(unittest.TestCase):
+    def _candidate(self) -> Candidate:
+        return Candidate(Category.POST, "9000001", RUN_START - timedelta(days=400), None)
+
+    def test_dry_run_client_blocks_mutation(self) -> None:
+        candidate = self._candidate()
+        for env in ({**ENV}, {**ENV, "DRY_RUN": "true"}):
+            fake = FakeThreadsApi()
+
+            def stub(cfg, client, started, out):  # type: ignore[no-untyped-def]
+                client.remove(candidate)
+
+            with mock.patch.object(main.cleanup, "run", stub):
+                code, _, err = run_main(fake, env)
+            self.assertEqual(code, 1)
+            self.assertIn("Error:", err)
+            self.assertEqual(fake.paths("DELETE"), [])
+            self.assertEqual(fake.requests, [])
+
+    def test_removal_mode_client_is_not_read_only(self) -> None:
+        seen: list[bool] = []
+
+        def stub(cfg, client, started, out):  # type: ignore[no-untyped-def]
+            seen.append(client.read_only)
+            raise ApiError("stop")
+
+        with mock.patch.object(main.cleanup, "run", stub):
+            run_main(FakeThreadsApi(), REMOVE_ENV)
+        self.assertEqual(seen, [False])
+        self.assertTrue(issubclass(MutationBlockedError, ApiError))
+
+    def test_log_records_are_redacted_by_handler_filter(self) -> None:
+        def stub(cfg, client, started, out):  # type: ignore[no-untyped-def]
+            logging.getLogger("threadsdelete.api").info("x %s", TOKEN)
+            raise ApiError("stop")
+
+        with mock.patch.object(main.cleanup, "run", stub):
+            _, out, err = run_main(FakeThreadsApi(), {**ENV, "LOG_LEVEL": "DEBUG"})
+        self.assertNotIn(TOKEN, out + err)
+        self.assertIn("[REDACTED]", err)
+
+    def test_httpx_request_logs_suppressed_at_debug(self) -> None:
+        _, _, err = run_main(fixture_api(), {**ENV, "LOG_LEVEL": "DEBUG"})
+        self.assertNotIn("HTTP Request:", err)
+
+    def test_identity_read_failure_exits_1(self) -> None:
+        bodyless = FakeThreadsApi()
+        bodyless.add("GET", "me", json_response({"username": "x"}))
+        down = FakeThreadsApi()
+        down.add("GET", "me", error_response(2, 503), repeat=True)
+        for fake in (bodyless, down):
+            code, out, err = run_main(fake, {**ENV, "MAX_RETRY_WAIT_SECONDS": "0"})
+            self.assertEqual(code, 1)
+            self.assertIn("Error:", err)
+            self.assertNotIn(TOKEN, out + err)
 
 
 if __name__ == "__main__":
