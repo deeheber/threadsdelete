@@ -2,7 +2,7 @@
 
 Verified against Meta documentation on 2026-10-23; live steps pending owner verification.
 
-This guide gets credentials for your own Threads account so `threadsdelete` can read and remove your content. Every command uses placeholders: never paste real IDs, secrets or tokens into this file, the README, an issue or a commit. Facts and sources are in [RESEARCH.md](RESEARCH.md); items it marks Unknown are called out below.
+Every command uses placeholders: never paste real IDs, secrets or tokens into this file, the README, an issue or a commit. Facts and sources are in [RESEARCH.md](RESEARCH.md); items it marks Unknown are called out below.
 
 ## Personal developer access versus serving other users
 
@@ -24,7 +24,7 @@ This tool uses an app in development mode with **you** as the only Threads Teste
 
 1. App Dashboard, App roles, Roles, Add People, choose Threads Tester, and enter your Threads username.
 2. Accept the invitation in Threads: Account settings, Website permissions (web or mobile app), signed in as that account.
-3. Until you accept, the authorization in step 4 fails.
+3. Until you accept, the authorization in step 5a fails.
 
 ## 4. Permissions
 
@@ -34,7 +34,7 @@ This tool uses an app in development mode with **you** as the only Threads Teste
 | `threads_read_replies` | Listing your own replies. |
 | `threads_delete` | Removing content and reading the deletion quota. |
 
-Unverified: Meta's authorization-window documentation lists `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` as `scope` values and does not list `threads_delete`, while the delete documentation requires it. Request all three in `scope` as shown below; if the consent screen does not offer `threads_delete`, enable it for the app in the dashboard first, and report what you see.
+Unverified: Meta's authorization-window documentation lists `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` as `scope` values and does not list `threads_delete`, while the delete documentation requires it. Request all three in `scope` as shown below; if the consent screen does not offer `threads_delete`, enable it for the app in the dashboard first.
 
 ## 5. Token acquisition and exchange (manual)
 
@@ -98,7 +98,7 @@ curl "https://graph.threads.com/refresh_access_token?grant_type=th_refresh_token
 
 ## 9. Revocation
 
-Remove the app under Threads Account settings, Website permissions, or remove your Threads Tester role in the App Dashboard. No revocation endpoint was found in the documentation (RESEARCH: Unknown), so use these. Rotate or reset the app secret in the dashboard if it was ever exposed.
+Remove the app under Threads Account settings, Website permissions, or remove your Threads Tester role in the App Dashboard. No revocation endpoint was found in the documentation (RESEARCH: Unknown). Rotate or reset the app secret in the dashboard if it was ever exposed.
 
 ## 10. What is not verified yet
 

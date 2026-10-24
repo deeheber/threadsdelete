@@ -1,6 +1,6 @@
 # threadsdelete
 
-Cleans up your own old [Threads](https://www.threads.com) content with Meta's official Threads API. Content older than a configurable number of days (default 90) is removed, locally or from a weekly GitHub Actions run. Modeled on [blueskydelete](https://github.com/deeheber/blueskydelete), which is the reference for the workflow and settings. Code here is written fresh; no blueskydelete source is adapted.
+Cleans up your own old [Threads](https://www.threads.com) content with Meta's official Threads API. Content older than a configurable number of days (default 90) is removed, locally or from a weekly GitHub Actions run. Modeled on [blueskydelete](https://github.com/deeheber/blueskydelete).
 
 **There is no undo.** A removed post is gone. The tool previews by default (`DRY_RUN=true`) and removes only when you set `DRY_RUN=false`.
 
@@ -10,7 +10,7 @@ Feasibility findings and API contracts: [docs/RESEARCH.md](docs/RESEARCH.md). Me
 
 ## Quick start
 
-> Uses [uv](https://docs.astral.sh/uv/). Install it from the uv docs if you do not have it.
+> Requires [uv](https://docs.astral.sh/uv/).
 
 1. Clone this repository (Python 3.14 is pinned in `.python-version`; uv installs it).
 2. Install dependencies: `uv sync --locked`
@@ -22,7 +22,7 @@ Feasibility findings and API contracts: [docs/RESEARCH.md](docs/RESEARCH.md). Me
 
 ## Settings
 
-Set these in `.env`, in the shell, or (for Actions) as repository Secrets/Variables. A value set in the process environment overrides the same key in `.env` (verified with uv 0.13.5 on 2026-10-23). An empty value counts as unset and falls back to the default, which is how unset Actions Variables behave.
+Set these in `.env`, in the shell, or (for Actions) as repository Secrets/Variables. A value set in the process environment overrides the same key in `.env`. An empty value counts as unset and falls back to the default, which is how unset Actions Variables behave.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ Set these in `.env`, in the shell, or (for Actions) as repository Secrets/Variab
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`, case-insensitive. |
 | `THREADS_ACCESS_TOKEN` | required | Long-lived Threads user token. A secret. |
 | `THREADS_USER_ID` | required | Your numeric Threads user ID; must match the token's account. |
-| `THREADS_API_VERSION` | `v1.0` | Threads API version, e.g. `v1.0`. |
+| `THREADS_API_VERSION` | `v1.0` | Threads API version. |
 | `MAX_DELETIONS_PER_RUN` | `100` | ⚠️ ASSUMPTION: removal attempts per run across all categories; `0` allows none. |
 | `HTTP_TIMEOUT_SECONDS` | `30` | ⚠️ ASSUMPTION: per-request timeout. |
 | `MAX_READ_RETRIES` | `3` | ⚠️ ASSUMPTION: retries for read requests only. Removals are never retried. |
@@ -87,7 +87,7 @@ Nothing from other people is ever touched: every record must prove it is yours (
 
 ## Cutoff
 
-One UTC run-start time is captured per run. An item is eligible when `its time <= run start - DAYS_AGO days`. Posts, quotes and replies use their creation time. With `DAYS_AGO=90` and a run at `2026-10-23T05:00:00Z`, everything created at or before `2026-07-25T05:00:00Z` is eligible. (Likes and reposts would use your own action time, not the original post's age, if they were supported.)
+One UTC run-start time is captured per run. An item is eligible when `its time <= run start - DAYS_AGO days`. Posts, quotes and replies use their creation time. With `DAYS_AGO=90` and a run at `2026-10-23T05:00:00Z`, everything created at or before `2026-07-25T05:00:00Z` is eligible.
 
 ## Quota and backlog
 
@@ -107,31 +107,34 @@ Removals run one at a time and are never retried. If one ends with an unknown ou
 | Targeted tests (dotted module/class) | `uv run python -m unittest {filter} -v` |
 | Build/syntax check | `uv run python -m compileall -q threadsdelete main.py` |
 | Offline smoke | `uv run main.py --help` |
-| Forced local preview | `DRY_RUN=true uv run --env-file .env main.py` |
-| Wrapper preview | `DRY_RUN=true ./scripts/run.sh` |
-| Explicit removal | `DRY_RUN=false ./scripts/run.sh` |
 | Budget measurements | `uv run python -c "from tests.test_budgets import report; report()"` |
 
-Tests are offline and use synthetic fixtures. Never run the live commands during development without owner-provided credentials.
+Tests are offline and use synthetic fixtures.
 
 ## Scheduled cleanup with GitHub Actions
 
 Two workflows live in `.github/workflows/`: `ci.yml` (offline checks on push and pull request, no credentials) and `cleanup-feed.yml` (the cleanup).
 
 1. In the repository go to Settings, Secrets and variables, Actions.
-2. **Secret**: `THREADS_ACCESS_TOKEN` (the only secret).
+2. **Secret**: `THREADS_ACCESS_TOKEN`.
 3. **Variables**: `THREADS_USER_ID`, and optionally `DRY_RUN`, `DAYS_AGO`, `LOG_LEVEL`, `THREADS_API_VERSION`, `MAX_DELETIONS_PER_RUN`, `HTTP_TIMEOUT_SECONDS`, `MAX_READ_RETRIES`, `MAX_RETRY_WAIT_SECONDS`. A missing Variable resolves to the default above. With `DRY_RUN` unset, scheduled runs are previews; set the Variable to `false` to enable real scheduled removal.
 4. Schedule: `cron: '0 5 * * 5'` (Fridays 05:00 UTC), edited directly in `cleanup-feed.yml`. The job's `timeout-minutes: 15` is an assumption you can change there too.
 5. Manual run: Actions tab, "Threads cleanup", Run workflow. The `dry_run` input defaults to `true` (forced preview); choose `variable` to follow the `DRY_RUN` Variable.
 6. Check results under Actions run history; each run writes a sanitized summary on the run page (the `=== Summary ===` block, or the last log lines on failure). Enable failure notifications in your GitHub notification settings for Actions.
 
-Things to know, per [GitHub's schedule documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule): scheduled workflows only run from the default branch, so merge the workflow there; runs can be delayed at busy times; and in public repositories scheduled workflows are disabled after 60 days without repository activity, so re-enable them or push occasionally. Runner minutes are billed under [GitHub's billing rules](https://docs.github.com/en/billing/concepts/product-billing/github-actions); a weekly run of a few minutes is normally within free allowances, but check your plan.
+Per [GitHub's schedule documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule):
 
-Runs are serialized (`concurrency: cleanup-feed`, `cancel-in-progress: false`). Local runs are **not** coordinated with Actions runs: avoid running both with `DRY_RUN=false` at the same time.
+- Scheduled workflows only run from the default branch, so merge the workflow there.
+- Runs can be delayed at busy times.
+- In public repositories, scheduled workflows are disabled after 60 days without repository activity. Re-enable them or push occasionally.
+
+Runner minutes are billed under [GitHub's billing rules](https://docs.github.com/en/billing/concepts/product-billing/github-actions). A weekly run of a few minutes is normally within free allowances.
+
+Runs are serialized (`concurrency: cleanup-feed`, `cancel-in-progress: false`). Local runs are not coordinated with Actions runs: avoid running both with `DRY_RUN=false` at the same time.
 
 ## Token maintenance
 
-Long-lived tokens last 60 days and this tool does not renew them (by design). Before expiry, replace `THREADS_ACCESS_TOKEN` in your local `.env` and in the GitHub secret by following [docs/META_SETUP.md](docs/META_SETUP.md). Once a token has expired the scheduled run fails with exit status 3 until you replace it. To revoke access, remove the app from your Threads account's website permissions.
+Long-lived tokens last 60 days and this tool does not renew them. Before expiry, replace `THREADS_ACCESS_TOKEN` in your local `.env` and in the GitHub secret by following [docs/META_SETUP.md](docs/META_SETUP.md). Once a token has expired the scheduled run fails with exit status 3 until you replace it. To revoke access, remove the app from your Threads account's website permissions.
 
 ## Troubleshooting
 
