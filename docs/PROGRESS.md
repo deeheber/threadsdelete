@@ -20,7 +20,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-09 Phase 2 close — push and manual checks
 - [x] P3-01 API removal and quota inspection
 - [x] P3-02 Sequential removal with quota budget
-- [ ] P3-03 Exit statuses and removal mode in the entry point
+- [x] P3-03 Exit statuses and removal mode in the entry point
 - [ ] P3-04 Tune MAX_DELETIONS_PER_RUN
 - [ ] P3-05 Phase 3 close — push and manual checks
 - [ ] P4-01 Offline CI workflow
@@ -97,3 +97,7 @@ remove(candidate) and get_quota(identity)->Quota added; 11 tests. Interpretation
 ### P3-02 — 1e4b5cb
 
 cleanup.run now handles dry and real runs (_check_quota, _remove_all). 9 new tests. Interpretation: quota requested only if eligible non-empty; failing item deferred on QuotaExceeded/Auth, counted unknown_outcome on UnknownOutcome (rest deferred); AuthError re-raised after summary; real run with a read-only client would raise MutationBlockedError (programming error). tests/fakes.py gained fixture_api(quota=True) (me, 2 thread pages, replies, quota 63 remaining) now used by test_cleanup/test_cli. Removal order for scenario: 9000001, 7000001, 9000002, 9000003, 9000004. Output line labels: removed/failed/unknown/would remove/deferred.
+
+### P3-03 — f07e7a5
+
+cleanup.exit_status added; main.py builds ThreadsClient(read_only=cfg.dry_run) and returns exit_status(summary); removal-not-available branch removed. Tests: exit status matrix + 5 CLI removal tests (82 total passing). No interpretation changes.
