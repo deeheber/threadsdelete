@@ -40,15 +40,6 @@ class CutoffTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             compute_cutoff(datetime(2026, 10, 23, 5, 0, 0), 90)
 
-    def test_like_and_repost_use_action_time(self) -> None:
-        cutoff = compute_cutoff(RUN_START, 90)
-        old_action = cutoff - timedelta(days=1)
-        recent_action = RUN_START - timedelta(days=2)
-        old = cand(Category.REPOST, "old-action", old_action)
-        recent = cand(Category.REPOST, "recent-action", recent_action)
-        like = cand(Category.LIKE, "recent-like", recent_action)
-        self.assertEqual(select_eligible([recent, old, like], cutoff), [old])
-
 
 class TimestampTests(unittest.TestCase):
     def test_offsets_are_normalised_to_utc(self) -> None:

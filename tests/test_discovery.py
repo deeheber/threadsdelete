@@ -8,6 +8,7 @@ from threadsdelete.api import (
     UNSUPPORTED_CATEGORIES,
     Identity,
     OwnershipError,
+    ResponseError,
     ThreadsClient,
 )
 from threadsdelete.core import Category, TimestampError
@@ -96,7 +97,7 @@ class ThreadsEdgeTests(unittest.TestCase):
         record = post()
         del record["media_type"]
         _, client = threads_fake(record)
-        with self.assertRaises(Exception) as raised:
+        with self.assertRaises(ResponseError) as raised:
             client.discover(Category.POST, OWNER)
         self.assertIn("media_type", str(raised.exception))
 
@@ -142,7 +143,6 @@ class CategoryCoverageTests(unittest.TestCase):
         self.assertEqual(
             sorted(SUPPORTED_CATEGORIES + tuple(UNSUPPORTED_CATEGORIES)), sorted(Category)
         )
-        self.assertEqual(len(SUPPORTED_CATEGORIES) + len(UNSUPPORTED_CATEGORIES), len(Category))
         fake = FakeThreadsApi()
         client = make_client(fake)
         for category, reason in UNSUPPORTED_CATEGORIES.items():

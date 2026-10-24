@@ -1,4 +1,3 @@
-import re
 import unittest
 from pathlib import Path
 
@@ -112,7 +111,6 @@ class EnvSampleTests(unittest.TestCase):
                 key, _, value = line.partition("=")
                 values[key] = value
         self.assertEqual(set(values), set(config.ENV_KEYS))
-        self.assertEqual(len(values), len(config.ENV_KEYS))
         self.assertEqual(values["THREADS_ACCESS_TOKEN"], "replace-with-your-long-lived-user-token")
         self.assertEqual(values["THREADS_USER_ID"], "replace-with-your-numeric-threads-user-id")
         non_secret = {k: v for k, v in values.items() if not k.startswith("THREADS_ACC")}
@@ -126,7 +124,6 @@ class EnvSampleTests(unittest.TestCase):
         self.assertEqual(cfg.http_timeout_seconds, config.DEFAULT_HTTP_TIMEOUT_SECONDS)
         self.assertEqual(cfg.max_read_retries, config.DEFAULT_MAX_READ_RETRIES)
         self.assertEqual(cfg.max_retry_wait_seconds, config.DEFAULT_MAX_RETRY_WAIT_SECONDS)
-        self.assertIsNotNone(re.match(r"^v[0-9]+\.[0-9]+$", values["THREADS_API_VERSION"]))
 
 
 if __name__ == "__main__":

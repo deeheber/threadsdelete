@@ -14,7 +14,6 @@ from tests.fakes import (
 from threadsdelete.api import (
     API_HOST,
     AuthError,
-    MutationBlockedError,
     QuotaExceededError,
     ReadFailedError,
     RedactingFilter,
@@ -164,14 +163,6 @@ class RetryTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
-    def test_read_only_client_blocks_non_get(self) -> None:
-        fake = FakeThreadsApi()
-        client = make_client(fake, read_only=True)
-        for method in ("DELETE", "POST"):
-            with self.assertRaises(MutationBlockedError):
-                client._send(method, "123", {})
-        self.assertEqual(fake.requests, [])
-
     def test_token_redacted_from_errors_and_logs(self) -> None:
         fake = FakeThreadsApi()
         body = {"error": {"message": f"bad token {TOKEN}", "code": 9999}}

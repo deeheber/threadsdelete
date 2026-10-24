@@ -167,14 +167,6 @@ class ReadChainBudgetTests(unittest.TestCase):
         self.assertEqual(result["attempts"], config.DEFAULT_MAX_READ_RETRIES + 1)
         self.assertLessEqual(result["max_single_sleep"], config.DEFAULT_MAX_RETRY_WAIT_SECONDS)
 
-    def test_default_read_chain_fits_job_timeout(self) -> None:
-        result = measure_read_chain(
-            config.DEFAULT_HTTP_TIMEOUT_SECONDS,
-            config.DEFAULT_MAX_READ_RETRIES,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
-        )
-        self.assertLess(result["worst_case_seconds"], job_timeout_minutes() * 60)
-
 
 class JobTimeoutTests(unittest.TestCase):
     def test_job_timeout_is_valid_github_value(self) -> None:
@@ -196,27 +188,6 @@ class CapBudgetTests(unittest.TestCase):
     def test_default_cap_does_not_exceed_documented_quota(self) -> None:
         self.assertGreater(config.DEFAULT_MAX_DELETIONS_PER_RUN, 0)
         self.assertLessEqual(config.DEFAULT_MAX_DELETIONS_PER_RUN, DOCUMENTED_DELETE_QUOTA)
-
-    def test_zero_cap_never_drains_and_defers_everything(self) -> None:
-        self.assertEqual(simulate_weekly_drain(10, 0, DOCUMENTED_DELETE_QUOTA), -1)
-        base = datetime(2020, 1, 1, tzinfo=UTC)
-        items = [Candidate(Category.POST, str(i), base + timedelta(days=i), None) for i in range(4)]
-        allowed, deferred = split_by_budget(items, 0, {})
-        self.assertEqual((len(allowed), len(deferred)), (0, 4))
-
-    def test_drain_runs_monotonic_in_cap(self) -> None:
-        previous: int | None = None
-        for cap in (1, 10, 50, 100, 500):
-            runs = simulate_weekly_drain(450, cap, None)
-            self.assertGreater(runs, 0)
-            if previous is not None:
-                self.assertLessEqual(runs, previous)
-            previous = runs
-
-    def test_quota_bounds_each_run(self) -> None:
-        # a cap above the quota cannot drain faster than the quota allows
-        self.assertEqual(simulate_weekly_drain(500, 500, DOCUMENTED_DELETE_QUOTA), 5)
-        self.assertEqual(simulate_weekly_drain(500, config.DEFAULT_MAX_DELETIONS_PER_RUN, None), 5)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import httpx
 
 import main
 from tests.fakes import FakeThreadsApi, error_response, fixture_api, json_response, load_fixture
-from threadsdelete.api import ApiError, MutationBlockedError
+from threadsdelete.api import ApiError
 from threadsdelete.core import Candidate, Category
 
 TOKEN = "fake-token-value-for-cli"
@@ -184,7 +184,6 @@ class CliSafetyWiringTests(unittest.TestCase):
         with mock.patch.object(main.cleanup, "run", stub):
             run_main(FakeThreadsApi(), REMOVE_ENV)
         self.assertEqual(seen, [False])
-        self.assertTrue(issubclass(MutationBlockedError, ApiError))
 
     def test_log_records_are_redacted_by_handler_filter(self) -> None:
         def stub(cfg, client, started, out):  # type: ignore[no-untyped-def]

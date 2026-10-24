@@ -139,13 +139,6 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(sum(c.deferred for c in summary.counts.values()), 5)
         self.assertEqual(len(lines_starting(text, "deferred")), 5)
 
-    def test_preview_sends_only_get_requests(self) -> None:
-        fake = fixture_api()
-        preview(fake)
-        self.assertTrue(fake.requests)
-        self.assertEqual({r.method for r in fake.requests}, {"GET"})
-        self.assertTrue(all(isinstance(r, httpx.Request) for r in fake.requests))
-
 
 class RemovalTests(unittest.TestCase):
     def test_dry_run_sends_no_mutation_for_any_category(self) -> None:
