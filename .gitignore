@@ -1,0 +1,11 @@
+.kukulu/implement.lock
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.sample
+*.token
+cleanup.log
