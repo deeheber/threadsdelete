@@ -7,7 +7,7 @@ Started: 2026-10-24T02:37:10.812Z
 
 - [x] P1-01 Research access, fees, permissions and token lifecycle
 - [x] P1-02 Research content categories, removal, quota and payload contracts
-- [ ] P1-03 Decide go or no-go
+- [x] P1-03 Decide go or no-go
 - [ ] P1-04 Phase 1 close — push and manual checks
 - [ ] P2-01 Project scaffold
 - [ ] P2-02 Configuration parsing and .env.sample
@@ -41,3 +41,7 @@ docs/RESEARCH.md created (25 headings). Findings [doc]: no documented API fee; t
 ### P1-02 — 8484378
 
 RESEARCH contracts filled. Supported: posts, replies, quotes, media/carousel (all Operation.DELETE via DELETE /{id}, success {"success":true,"deleted_id":..}). Unsupported: reposts (no documented removal; REPOST_FACADE records scanned and skipped), likes (no API). Ownership: posts/quotes owner.id==identity id; replies is_reply_owned_by_me true AND username==identity username. Pagination: limit<=100, continue while paging.next, re-request with after cursor. Errors: auth 190/401/403/10/200-299/3; throttling 4,17,341/429 -> QuotaExceeded; 5xx unknown on removal; other 4xx with well-formed body = ItemError on removal. Quota: GET /{uid}/threads_publishing_limit?fields=delete_quota_usage,delete_config, data[0], remaining=quota_total-usage, 86400s window; only DELETE operation. Token as access_token query param.
+
+### P1-03 — 9659c04
+
+Decision: GO (criteria a-d all yes, doc-only). Unsupported categories reposts and likes omitted.
