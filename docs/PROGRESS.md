@@ -14,7 +14,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-03 Core candidate types, timestamps and eligibility
 - [x] P2-04 API client transport, pagination, retries and redaction
 - [x] P2-05 Category discovery and record validation
-- [ ] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
+- [x] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
 - [ ] P2-07 Cleanup preview: identity, complete discovery, selection and report
 - [ ] P2-08 Entry point, logging and local wrapper
 - [ ] P2-09 Phase 2 close — push and manual checks
@@ -70,3 +70,9 @@ api.py read side + fakes + 14 tests. Interpretation: token as access_token query
 ### P2-05 — bc8522e
 
 discover(category, identity)->(candidates, scanned) added to ThreadsClient. SUPPORTED_CATEGORIES=(POST,QUOTE,REPLY); UNSUPPORTED={REPOST,LIKE} with reasons. Interpretation: reposts unsupported per RESEARCH so no repost-action-time test; REPOST_FACADE counted in POST's scanned, not returned, no ownership check; /me/threads fetched once and cached per client (POST+QUOTE share it); missing media_type aborts (ResponseError); replies: is_reply_owned_by_me True + username==identity.username else OwnershipError; TimestampError propagates. Fixtures: threads_page1.json, threads_page2.json (A1 cursor, 6 records), replies.json (2 replies); identity example_owner/1000001. Dedicated limit=100 params.
+
+### P2-06 — f26e271
+
+tests/test_budgets.py: measure_read_chain, report(), 2 tests (JOB_TIMEOUT_MINUTES_ASSUMED=15 in module; P3-04 extends this file, P4-03 should read the YAML value).
+Measurement: HTTP_TIMEOUT_SECONDS/MAX_READ_RETRIES/MAX_RETRY_WAIT_SECONDS before=30/3/60 (4 attempts, 7s sleep, 127s worst case/chain) after=same decision=kept because 127s << 900s job timeout (retries 5: 211s; timeout 60: 247s; Retry-After at 60s cap: 300s).
+Live measurement: pending (human)
