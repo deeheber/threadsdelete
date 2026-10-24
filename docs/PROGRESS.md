@@ -6,7 +6,7 @@ Started: 2026-10-24T02:37:10.812Z
 ## Tasks
 
 - [x] P1-01 Research access, fees, permissions and token lifecycle
-- [ ] P1-02 Research content categories, removal, quota and payload contracts
+- [x] P1-02 Research content categories, removal, quota and payload contracts
 - [ ] P1-03 Decide go or no-go
 - [ ] P1-04 Phase 1 close — push and manual checks
 - [ ] P2-01 Project scaffold
@@ -37,3 +37,7 @@ Started: 2026-10-24T02:37:10.812Z
 ### P1-01 — fb5733f
 
 docs/RESEARCH.md created (25 headings). Findings [doc]: no documented API fee; tester role allows own-account use without App Review; perms threads_basic, threads_delete, threads_read_replies; host graph.threads.com, version v1.0; token via access_token query param (only documented transport); identity GET /me?fields=id,username; tokens 1h short / 60d long, refresh after 24h. Postman page unreadable (JS shell) - carried as not revalidated. Interpretation: query-param token (not Bearer) since Bearer is undocumented; later tasks must redact access_token in URLs. threads_delete missing from authorize-window scope list: flagged Unknown.
+
+### P1-02 — 8484378
+
+RESEARCH contracts filled. Supported: posts, replies, quotes, media/carousel (all Operation.DELETE via DELETE /{id}, success {"success":true,"deleted_id":..}). Unsupported: reposts (no documented removal; REPOST_FACADE records scanned and skipped), likes (no API). Ownership: posts/quotes owner.id==identity id; replies is_reply_owned_by_me true AND username==identity username. Pagination: limit<=100, continue while paging.next, re-request with after cursor. Errors: auth 190/401/403/10/200-299/3; throttling 4,17,341/429 -> QuotaExceeded; 5xx unknown on removal; other 4xx with well-formed body = ItemError on removal. Quota: GET /{uid}/threads_publishing_limit?fields=delete_quota_usage,delete_config, data[0], remaining=quota_total-usage, 86400s window; only DELETE operation. Token as access_token query param.
