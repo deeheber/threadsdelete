@@ -1,0 +1,66 @@
+name: Threads cleanup
+
+on:
+  schedule:
+    - cron: '0 5 * * 5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'true forces a preview; variable follows the DRY_RUN repository variable'
+        type: choice
+        options:
+          - 'true'
+          - 'variable'
+        default: 'true'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleanup-feed
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Run cleanup
+        shell: bash
+        run: uv run main.py 2>&1 | tee cleanup.log
+        env:
+          PYTHONUNBUFFERED: '1'
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ vars.THREADS_USER_ID }}
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true') && 'true' || vars.DRY_RUN }}
+          DAYS_AGO: ${{ vars.DAYS_AGO }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+          THREADS_API_VERSION: ${{ vars.THREADS_API_VERSION }}
+          MAX_DELETIONS_PER_RUN: ${{ vars.MAX_DELETIONS_PER_RUN }}
+          HTTP_TIMEOUT_SECONDS: ${{ vars.HTTP_TIMEOUT_SECONDS }}
+          MAX_READ_RETRIES: ${{ vars.MAX_READ_RETRIES }}
+          MAX_RETRY_WAIT_SECONDS: ${{ vars.MAX_RETRY_WAIT_SECONDS }}
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Threads cleanup"
+            if [ -f cleanup.log ]; then
+              echo '```'
+              if grep -q '^=== Summary ===' cleanup.log; then
+                sed -n '/^=== Summary ===/,$p' cleanup.log
+              else
+                tail -n 20 cleanup.log
+              fi
+              echo '```'
+            else
+              echo "No cleanup log was produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
