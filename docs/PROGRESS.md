@@ -30,7 +30,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P4-05 Meta setup and token maintenance guide
 - [x] P4-06 Final offline checks, push and handoff checks
 - [x] R1-01 Test main.py dry-run read-only wiring, log redaction layers and generic API error exit
-- [ ] R1-02 Test that a conflicting duplicate marks the run's discovery incomplete
+- [x] R1-02 Test that a conflicting duplicate marks the run's discovery incomplete
 
 ## Log
 
@@ -146,3 +146,7 @@ Manual check: NOT VERIFIED (human)
 ### R1-01 — 0385198
 
 Added CliSafetyWiringTests (5 tests) in tests/test_cli.py. Manually mutated main.py for read_only, handler filter, httpx pin, generic ApiError exit: each fails tests. main.py unchanged. Dry-run block surfaces as exit 1 via ApiError mapping.
+
+### R1-02 — 076de4c
+
+Added test_conflicting_duplicate_marks_discovery_incomplete (tests/test_cleanup.py): reply sharing post id 9000001 with different timestamp. Mutant discovery.complete=True verified killed. cleanup.py unchanged.
