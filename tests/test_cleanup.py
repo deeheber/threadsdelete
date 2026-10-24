@@ -261,6 +261,30 @@ class RemovalTests(unittest.TestCase):
         self.assertEqual({r.method for r in fake.requests}, {"GET"})
         self.assertIn("Discovery: INCOMPLETE", text)
 
+    def test_conflicting_duplicate_marks_discovery_incomplete(self) -> None:
+        fake = FakeThreadsApi()
+        fake.add("GET", "me", json_response(load_fixture("me.json")))
+        fake.add(
+            "GET",
+            "me/threads",
+            json_response(load_fixture("threads_page1.json")),
+            json_response(load_fixture("threads_page2.json")),
+        )
+        clash = {
+            "id": "9000001",
+            "timestamp": "2026-01-06T10:00:00+0000",
+            "username": "example_owner",
+            "is_reply": True,
+            "is_reply_owned_by_me": True,
+        }
+        fake.add("GET", "me/replies", json_response({"data": [clash]}))
+        text, summary, _ = real_run(fake)
+        assert summary is not None
+        self.assertFalse(summary.discovery_complete)
+        self.assertIn("Discovery: INCOMPLETE", text)
+        self.assertEqual(deletes(fake), [])
+        self.assertEqual(cleanup.exit_status(summary), ExitCode.FAILURE)
+
     def test_counts_add_up(self) -> None:
         fake = fixture_api()
         fake.add("DELETE", "9000001", OK)
