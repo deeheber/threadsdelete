@@ -1,51 +1,22 @@
 {
-  "round": 1,
-  "implemented": true,
-  "reviewed": true,
-  "verdict": "APPROVED",
-  "summarized": true,
+  "round": 0,
+  "implemented": false,
+  "reviewed": false,
+  "verdict": null,
+  "summarized": false,
   "halted": null,
   "preexistingUntracked": [],
   "policies": {
     "signing": "auto",
     "push": true,
     "pr": "draft",
-    "feedback": true,
-    "archive": false,
-    "finalize": "auto",
-    "mergeMethod": "merge",
-    "syncBase": true
+    "feedback": true
   },
-  "signing": "on",
-  "rounds": [
-    {
-      "round": 1,
-      "fixTasks": 2,
-      "unblocked": 0,
-      "verdict": "CHANGES REQUESTED",
-      "nonConverging": false,
-      "sources": {
-        "review": 2,
-        "mutation": 0,
-        "blocked": 0
-      },
-      "at": "2026-10-24T03:05:58.917Z"
-    },
-    {
-      "round": 2,
-      "fixTasks": 0,
-      "unblocked": 0,
-      "verdict": "APPROVED",
-      "sources": {
-        "review": 0,
-        "mutation": 0,
-        "blocked": 0
-      },
-      "at": "2026-10-24T03:10:43.808Z"
-    }
-  ],
-  "cleanroom": {
-    "mode": "general"
-  },
-  "breaking": false
+  "signing": null,
+  "rounds": [],
+  "archived": {
+    "slug": "threadsdelete",
+    "dir": "docs/flights/threadsdelete",
+    "at": "2026-10-24T03:55:44.685Z"
+  }
 }
