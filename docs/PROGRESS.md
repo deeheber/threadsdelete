@@ -28,7 +28,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P4-03 Tune the cleanup job timeout-minutes
 - [x] P4-04 README
 - [x] P4-05 Meta setup and token maintenance guide
-- [ ] P4-06 Final offline checks, push and handoff checks
+- [x] P4-06 Final offline checks, push and handoff checks
 
 ## Log
 
@@ -134,3 +134,9 @@ README.md written (all SPEC section 7 commands incl. literal {filter} row; both 
 ### P4-05 — 1bb335a
 
 docs/META_SETUP.md written (dated 2026-10-23, live steps pending). Headings: registration, app and use case, testers, permissions, token acquisition and exchange, account ID, store, expiry and manual renewal, revocation, unverified items. Curl exchange/refresh with placeholders only. Unverified items flagged: threads_delete in scope, redirect URI behaviour, revocation endpoint.
+
+### P4-06 — bc202f6
+
+Completed offline checks (all exit 0): uv sync --locked; mypy threadsdelete main.py; ruff check .; ruff format --check .; unittest discover (95 tests OK); compileall; main.py --help. Workflow/CLI default consistency covered by tests/test_workflows.py and test_env_sample_matches_config. Push: ok.
+Pending live validation: 1. Follow README.md from a fresh checkout. 2. Configure Secrets/Variables and run an owner-authorized `workflow_dispatch` preview (`dry_run=true`); inspect the job summary. 3. Owner sets `DRY_RUN=false` to enable real scheduled cleanup. 4. Live items from docs/RESEARCH.md § Untested and pending.
+Manual check: NOT VERIFIED (human)
