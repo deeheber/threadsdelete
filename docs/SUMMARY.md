@@ -132,3 +132,7 @@ None. Every survivor from review 1 was killed in review 2, and review 2's Notes 
 ## Breaking call
 
 Breaking: no — greenfield project. The base held only docs, so no existing public interface, config default or user behavior changes.
+
+## Awaiting signing
+
+Unlock the signing agent, then tell the flight controller to finalize with re-signing: kukulu_pr_finalize({ resign: true }). Or by hand: git rebase -f --rebase-merges --gpg-sign c29457ce8c0ad1cd43e5bf2c77bd548a089db161, then git push --force-with-lease, then kukulu_pr_finalize({}).
