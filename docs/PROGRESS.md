@@ -17,7 +17,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
 - [x] P2-07 Cleanup preview: identity, complete discovery, selection and report
 - [x] P2-08 Entry point, logging and local wrapper
-- [ ] P2-09 Phase 2 close — push and manual checks
+- [x] P2-09 Phase 2 close — push and manual checks
 - [ ] P3-01 API removal and quota inspection
 - [ ] P3-02 Sequential removal with quota budget
 - [ ] P3-03 Exit statuses and removal mode in the entry point
@@ -84,3 +84,8 @@ cleanup.py: IdentityMismatchError, verify_identity, Discovery, discover_all, spl
 ### P2-08 — f7aac80
 
 main.py wired (main(argv,*,env,transport,now,out,err)); scripts/run.sh executable; 7 CLI tests. Wrapper smoke: `env -i ... ./scripts/run.sh --help` exits 0; without env exits 2. Interpretation: root-logger handler added/removed within main(); errors printed via redact(str(exc), secrets) where `secrets` is a local tuple (the no-token-in-logs pattern flags any print line naming access_token). Removal branch (DRY_RUN=false) still returns CONFIG - P3-03 must replace and construct ThreadsClient(read_only=config.dry_run).
+
+### P2-09 — b3b99fd
+
+Push: ok. 1. `uv run main.py --help` works with no credentials. 2. `uv run python -m unittest tests.test_cleanup tests.test_cli -v` shows the expected fixture candidates. 3. With owner-supplied credentials in `.env`: `DRY_RUN=true ./scripts/run.sh` prints a live preview, and nothing changes in Threads.
+Manual check: NOT VERIFIED (human)
