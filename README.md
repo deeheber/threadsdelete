@@ -151,6 +151,8 @@ Long-lived tokens last 60 days and this tool does not renew them. Before expiry,
 
 Reference project: [deeheber/blueskydelete](https://github.com/deeheber/blueskydelete).
 
+Built with [Kūkulu](https://kukulu.tech) ([GitHub](https://github.com/DisplaceTech/kukulu)), which planned, implemented and reviewed it from `docs/SPEC.md`. The build's plan, progress log and reviews are in [docs/flights/threadsdelete/](docs/flights/threadsdelete/).
+
 ## License
 
 [MIT](LICENSE)
