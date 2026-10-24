@@ -24,7 +24,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P3-04 Tune MAX_DELETIONS_PER_RUN
 - [x] P3-05 Phase 3 close — push and manual checks
 - [x] P4-01 Offline CI workflow
-- [ ] P4-02 Scheduled cleanup workflow
+- [x] P4-02 Scheduled cleanup workflow
 - [ ] P4-03 Tune the cleanup job timeout-minutes
 - [ ] P4-04 README
 - [ ] P4-05 Meta setup and token maintenance guide
@@ -116,3 +116,7 @@ Manual check: NOT VERIFIED (human)
 ### P4-01 — 9c0fd9a
 
 ci.yml added. Pinned SHAs (lightweight tags, git ls-remote 2026-10-23): actions/checkout v7.0.1 = 3d3c42e5aac5ba805825da76410c181273ba90b1; astral-sh/setup-uv v10.3.2 = 07a047e608db84b3d8c06cd9a7c7dcc9c355c18e (reuse in cleanup-feed.yml). Job timeout-minutes 10 (CI only). Not run on GitHub: unverified live.
+
+### P4-02 — 59e7159
+
+cleanup-feed.yml + test_workflows.py (93 tests total). Interpretation: PYTHONUNBUFFERED=1 in the run step; DRY_RUN mapped as `(dispatch && inputs.dry_run == 'true') && 'true' || vars.DRY_RUN`; all other ENV_KEYS as `${{ vars.KEY }}` with no literals; THREADS_ACCESS_TOKEN the only secret. timeout-minutes: 15 (tuned in P4-03). YAML syntax checked via ruby; never run on GitHub (live check pending). Summary step simulated locally and works.
