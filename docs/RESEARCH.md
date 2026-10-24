@@ -2,7 +2,7 @@
 
 ## Summary
 
-Pending (P1-03).
+Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported (documentation findings): posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. Unsupported: reposts (no documented removal call) and likes (no API at all). Untested: everything live, because no credentials were used; notably the `threads_delete` scope grant, reply/quote deletion, app-created versus Threads-app-created coverage, and the error code of the deletion limit (see Untested and pending).
 
 ## Sources
 
@@ -238,4 +238,11 @@ None. No credentials were available or used (research protocol), and no account 
 
 ## Conclusion
 
-Pending (P1-03).
+Decision: GO
+
+- (a) Documented endpoint removes the owner's own posts: yes. `DELETE /{threads-media-id}` with `threads_basic` and `threads_delete` (https://developers.facebook.com/documentation/threads/posts/delete-posts, 2026-10-23).
+- (b) No documented API fee or paid tier for personal developer use: yes. None found in the overview, get-started or delete pages; Meta platform terms not reviewed (listed as pending).
+- (c) Owner can use their own account via an app role/tester without serving other users: yes. Testers can grant permissions without App Review (https://developers.facebook.com/documentation/threads/get-started).
+- (d) SPEC section 4's architecture still fits: yes. Identity, paginated GET discovery, a quota GET and a single DELETE per item fit `api.py`/`core.py`/`cleanup.py`; no helper, database or callback service is needed. Token comes from manual steps in `docs/META_SETUP.md`.
+
+All findings are documentation findings; none is live-verified.
