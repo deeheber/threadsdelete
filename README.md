@@ -147,3 +147,7 @@ Long-lived tokens last 60 days and this tool does not renew them (by design). Be
 ## Credit
 
 Reference project: [deeheber/blueskydelete](https://github.com/deeheber/blueskydelete).
+
+## License
+
+[MIT](LICENSE)

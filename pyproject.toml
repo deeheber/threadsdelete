@@ -3,6 +3,7 @@ name = "threadsdelete"
 version = "0.1.0"
 description = "Personal Threads cleanup tool using the official Meta Threads API"
 requires-python = ">=3.14"
+license = "MIT"
 dependencies = ["httpx>=0.28"]
 
 [dependency-groups]
