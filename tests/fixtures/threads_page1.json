@@ -1,0 +1,15 @@
+{
+  "data": [
+    {"id": "9000001", "media_type": "TEXT_POST", "timestamp": "2026-01-05T10:00:00+0000",
+     "permalink": "https://www.threads.com/@example_owner/post/AAA1", "owner": {"id": "1000001"},
+     "is_quote_post": false},
+    {"id": "9000002", "media_type": "IMAGE", "timestamp": "2026-02-10T08:30:00+0000",
+     "permalink": "https://www.threads.com/@example_owner/post/AAA2", "owner": {"id": "1000001"},
+     "is_quote_post": false},
+    {"id": "9000003", "media_type": "CAROUSEL_ALBUM", "timestamp": "2026-03-01T12:00:00+0000",
+     "permalink": "https://www.threads.com/@example_owner/post/AAA3", "owner": {"id": "1000001"},
+     "is_quote_post": false, "children": {"data": [{"id": "9000031"}, {"id": "9000032"}]}}
+  ],
+  "paging": {"cursors": {"before": "B1", "after": "A1"},
+             "next": "https://graph.threads.com/v1.0/me/threads?after=A1"}
+}

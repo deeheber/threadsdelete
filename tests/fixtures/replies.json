@@ -1,0 +1,10 @@
+{
+  "data": [
+    {"id": "7000001", "timestamp": "2026-01-20T10:00:00+0000", "username": "example_owner",
+     "permalink": "https://www.threads.com/@example_owner/post/RRR1", "is_reply": true,
+     "is_reply_owned_by_me": true},
+    {"id": "7000002", "timestamp": "2026-10-21T10:00:00+0000", "username": "example_owner",
+     "is_reply": true, "is_reply_owned_by_me": true}
+  ],
+  "paging": {"cursors": {"before": "RB", "after": "RA"}}
+}

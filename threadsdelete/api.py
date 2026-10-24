@@ -10,10 +10,25 @@ from typing import Self
 
 import httpx
 
+from threadsdelete.core import Candidate, Category, parse_timestamp
+
 API_HOST = "graph.threads.com"
 Transport = httpx.BaseTransport
 
 REDACTED = "[REDACTED]"
+
+# Categories from docs/RESEARCH.md Contracts > Category: *. Media and carousel posts are POST.
+SUPPORTED_CATEGORIES: tuple[Category, ...] = (Category.POST, Category.QUOTE, Category.REPLY)
+UNSUPPORTED_CATEGORIES: Mapping[Category, str] = {
+    Category.REPOST: "no documented call removes a repost (docs/RESEARCH.md)",
+    Category.LIKE: "no documented endpoint lists or removes the owner's likes (docs/RESEARCH.md)",
+}
+_THREADS_PATH = "me/threads"
+_THREADS_FIELDS = "id,timestamp,permalink,owner,media_type,is_quote_post"
+_REPLIES_PATH = "me/replies"
+_REPLIES_FIELDS = "id,timestamp,permalink,username,is_reply,is_reply_owned_by_me"
+_PAGE_SIZE = "100"
+_REPOST_TYPE = "REPOST_FACADE"
 
 # Error codes from docs/RESEARCH.md Contracts > Errors.
 _AUTH_CODES = frozenset({10, 190, 3}) | frozenset(range(200, 300))
@@ -125,6 +140,7 @@ class ThreadsClient:
         self._max_wait = max_retry_wait_seconds
         self._read_only = read_only
         self._sleep = sleep
+        self._edges: dict[str, list[dict[str, object]]] = {}
         self._http = httpx.Client(
             base_url=f"https://{API_HOST}/{api_version}/",
             timeout=timeout_seconds,
@@ -266,3 +282,69 @@ class ThreadsClient:
         if not isinstance(username, str) or not username:
             raise self._fail(ResponseError, "identity response lacks a username")
         return Identity(user_id=user_id, username=username)
+
+    # -- discovery -----------------------------------------------------------------
+
+    def _edge(self, path: str, fields: str) -> list[dict[str, object]]:
+        """All records of one list edge, fetched once per client (never mutates)."""
+        if path not in self._edges:
+            self._edges[path] = self.get_all(path, {"fields": fields, "limit": _PAGE_SIZE})
+        return self._edges[path]
+
+    def discover(self, category: Category, identity: Identity) -> tuple[list[Candidate], int]:
+        """Candidates of one supported category and the number of records scanned.
+
+        Scanned counts records classified into the category; records of an unsupported
+        category found on the same edge (reposts) are counted under POST and not returned.
+        """
+        if category not in SUPPORTED_CATEGORIES:
+            raise ValueError(f"unsupported category: {category}")
+        if category is Category.REPLY:
+            return self._discover_replies(identity)
+        return self._discover_threads(category, identity)
+
+    def _discover_threads(
+        self, wanted: Category, identity: Identity
+    ) -> tuple[list[Candidate], int]:
+        found: list[Candidate] = []
+        scanned = 0
+        for record in self._edge(_THREADS_PATH, _THREADS_FIELDS):
+            media_type = record.get("media_type")
+            if not isinstance(media_type, str) or not media_type:
+                raise self._fail(ResponseError, "record lacks a media_type; cannot classify")
+            if media_type == _REPOST_TYPE:
+                if wanted is Category.POST:
+                    scanned += 1  # unsupported category: scanned, never a candidate
+                continue
+            category = Category.QUOTE if record.get("is_quote_post") is True else Category.POST
+            if category is not wanted:
+                continue
+            scanned += 1
+            owner = record.get("owner")
+            owner_id = owner.get("id") if isinstance(owner, dict) else None
+            if owner_id != identity.user_id:
+                raise self._fail(OwnershipError, "record owner does not match the account")
+            found.append(self._candidate(category, record))
+        return found, scanned
+
+    def _discover_replies(self, identity: Identity) -> tuple[list[Candidate], int]:
+        found: list[Candidate] = []
+        records = self._edge(_REPLIES_PATH, _REPLIES_FIELDS)
+        for record in records:
+            if record.get("is_reply_owned_by_me") is not True:
+                raise self._fail(OwnershipError, "reply is not confirmed as owned by the account")
+            if record.get("username") != identity.username:
+                raise self._fail(OwnershipError, "reply username does not match the account")
+            found.append(self._candidate(Category.REPLY, record))
+        return found, len(records)
+
+    def _candidate(self, category: Category, record: dict[str, object]) -> Candidate:
+        target_id = record["id"]
+        permalink = record.get("permalink")
+        assert isinstance(target_id, str)  # validated by get_all
+        return Candidate(
+            category=category,
+            target_id=target_id,
+            action_at=parse_timestamp(record.get("timestamp")),
+            permalink=permalink if isinstance(permalink, str) and permalink else None,
+        )
