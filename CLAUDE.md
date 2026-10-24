@@ -71,6 +71,7 @@ Reviewer checks by reading (structural, not a line pattern):
 - All discovery for all supported categories finishes before the first `remove` call.
 - `remove` is called at most once per candidate per run; no retry wrapper around it.
 - `scripts/run.sh` contains no cleanup logic; exit status is preserved (`exec`, `pipefail`).
+- No `${{ }}` expression inside a multi-line `run: |` block (the `no-expression-in-run` pattern cannot see block context).
 - Test fixtures are synthetic; `.env`, tokens and real account data are never committed.
 - If any Bluesky source is adapted, its MIT notice is retained.
 
