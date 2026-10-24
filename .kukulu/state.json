@@ -16,7 +16,7 @@
     "mergeMethod": "merge",
     "syncBase": true
   },
-  "signing": "none",
+  "signing": "on",
   "rounds": [
     {
       "round": 1,
@@ -47,10 +47,5 @@
   "cleanroom": {
     "mode": "general"
   },
-  "breaking": false,
-  "awaitingSigning": {
-    "unsigned": 61,
-    "first": "0a5a01734eda0a1ff161ee4a4117c02e0c4ae775",
-    "since": "2026-10-24T03:12:10.685Z"
-  }
+  "breaking": false
 }
