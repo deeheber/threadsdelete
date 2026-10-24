@@ -23,7 +23,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P3-03 Exit statuses and removal mode in the entry point
 - [x] P3-04 Tune MAX_DELETIONS_PER_RUN
 - [x] P3-05 Phase 3 close — push and manual checks
-- [ ] P4-01 Offline CI workflow
+- [x] P4-01 Offline CI workflow
 - [ ] P4-02 Scheduled cleanup workflow
 - [ ] P4-03 Tune the cleanup job timeout-minutes
 - [ ] P4-04 README
@@ -112,3 +112,7 @@ Live measurement: pending (human)
 
 Push: ok. After the owner authorizes specific disposable test posts: set DAYS_AGO so only they are eligible, run `DRY_RUN=true ./scripts/run.sh` and confirm the preview lists exactly them, run `DRY_RUN=false ./scripts/run.sh`, confirm they are gone in Threads and the exit status is 0. Until authorized, this check is pending.
 Manual check: NOT VERIFIED (human)
+
+### P4-01 — 9c0fd9a
+
+ci.yml added. Pinned SHAs (lightweight tags, git ls-remote 2026-10-23): actions/checkout v7.0.1 = 3d3c42e5aac5ba805825da76410c181273ba90b1; astral-sh/setup-uv v10.3.2 = 07a047e608db84b3d8c06cd9a7c7dcc9c355c18e (reuse in cleanup-feed.yml). Job timeout-minutes 10 (CI only). Not run on GitHub: unverified live.
