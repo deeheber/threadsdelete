@@ -5,7 +5,7 @@ Started: 2026-10-24T02:37:10.812Z
 
 ## Tasks
 
-- [ ] P1-01 Research access, fees, permissions and token lifecycle
+- [x] P1-01 Research access, fees, permissions and token lifecycle
 - [ ] P1-02 Research content categories, removal, quota and payload contracts
 - [ ] P1-03 Decide go or no-go
 - [ ] P1-04 Phase 1 close — push and manual checks
@@ -33,3 +33,7 @@ Started: 2026-10-24T02:37:10.812Z
 ## Log
 
 (one entry per task, appended by implement)
+
+### P1-01 — fb5733f
+
+docs/RESEARCH.md created (25 headings). Findings [doc]: no documented API fee; tester role allows own-account use without App Review; perms threads_basic, threads_delete, threads_read_replies; host graph.threads.com, version v1.0; token via access_token query param (only documented transport); identity GET /me?fields=id,username; tokens 1h short / 60d long, refresh after 24h. Postman page unreadable (JS shell) - carried as not revalidated. Interpretation: query-param token (not Bearer) since Bearer is undocumented; later tasks must redact access_token in URLs. threads_delete missing from authorize-window scope list: flagged Unknown.
