@@ -1,6 +1,6 @@
 # threadsdelete
 
-Personal Threads cleanup tool (official Meta Threads API only) that removes the owner's own content by age, locally and from a weekly GitHub Actions cron. Source of truth: `docs/SPEC.md`, which wins over `docs/PLAN.md`, which wins over code comments.
+Personal Threads cleanup tool (official Meta Threads API only) that removes the owner's own content by age, locally and from a weekly GitHub Actions cron. Source of truth: `docs/SPEC.md`, which wins over code comments. The first build's plan, progress log and reviews are archived in `docs/flights/threadsdelete/`.
 
 ## Principles
 
@@ -46,7 +46,7 @@ Live commands (`./scripts/run.sh`, `uv run --env-file .env main.py`) need the ow
 
 ## Constraints
 
-Checked by `kukulu_verify` (ids in `docs/kukulu.json` `constraints`):
+Checked by `kukulu_verify` during a flight (the first build's rule definitions are in `docs/flights/threadsdelete/kukulu.json` `constraints`):
 
 - `no-hardcoded-assumption-defaults`: the ⚠️ ASSUMPTION defaults (`MAX_DELETIONS_PER_RUN`, `HTTP_TIMEOUT_SECONDS`, `MAX_READ_RETRIES`, `MAX_RETRY_WAIT_SECONDS`) are literals only in `threadsdelete/config.py`.
 - `core-is-pure`: `threadsdelete/core.py` imports no os/sys/time/socket/httpx/pathlib/io/logging, calls no `open(`, `sleep(`, `datetime.now(`.
