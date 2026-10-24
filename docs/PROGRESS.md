@@ -12,7 +12,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-01 Project scaffold
 - [x] P2-02 Configuration parsing and .env.sample
 - [x] P2-03 Core candidate types, timestamps and eligibility
-- [ ] P2-04 API client transport, pagination, retries and redaction
+- [x] P2-04 API client transport, pagination, retries and redaction
 - [ ] P2-05 Category discovery and record validation
 - [ ] P2-06 Tune HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES and MAX_RETRY_WAIT_SECONDS
 - [ ] P2-07 Cleanup preview: identity, complete discovery, selection and report
@@ -62,3 +62,7 @@ config.py + .env.sample + 8 tests. Interpretation: error messages never echo any
 ### P2-03 — 51d34cf
 
 core.py done, 8 tests. Interpretation: conflicting duplicate action times raise SelectionError before eligibility filtering. parse_timestamp uses datetime.fromisoformat (py3.14 accepts +0000 and Z); date-only/naive rejected. Types per CLAUDE.md map, RunSummary.notes is default_factory list.
+
+### P2-04 — a968d76
+
+api.py read side + fakes + 14 tests. Interpretation: token as access_token query param (RESEARCH); API_HOST graph.threads.com; ThreadsClient._send(method, path, params) is the single request primitive (read-only guard lives there) and _get(path, params) does bounded retry; _classify(response) maps status/codes (reuse for removal in P3-01: 401/403/auth codes->AuthError, 429/codes 4,17,341->QuotaExceededError, else ResponseError); _fail(kind,msg) redacts. Backoff min(2**attempt,max) from attempt 0. FakeThreadsApi: add(method,path,*replies,repeat=), .requests, .sleeps, .calls(), .paths(), json_response, error_response(code,status) helpers; make_client(fake, **overrides) read_only=True default, sleep=fake.sleeps.append. Paths keyed without version prefix (e.g. "me/threads"). Warning logs on retries print to stderr during tests (harmless).
