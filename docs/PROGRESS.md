@@ -25,7 +25,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P3-05 Phase 3 close — push and manual checks
 - [x] P4-01 Offline CI workflow
 - [x] P4-02 Scheduled cleanup workflow
-- [ ] P4-03 Tune the cleanup job timeout-minutes
+- [x] P4-03 Tune the cleanup job timeout-minutes
 - [ ] P4-04 README
 - [ ] P4-05 Meta setup and token maintenance guide
 - [ ] P4-06 Final offline checks, push and handoff checks
@@ -120,3 +120,9 @@ ci.yml added. Pinned SHAs (lightweight tags, git ls-remote 2026-10-23): actions/
 ### P4-02 — 59e7159
 
 cleanup-feed.yml + test_workflows.py (93 tests total). Interpretation: PYTHONUNBUFFERED=1 in the run step; DRY_RUN mapped as `(dispatch && inputs.dry_run == 'true') && 'true' || vars.DRY_RUN`; all other ENV_KEYS as `${{ vars.KEY }}` with no literals; THREADS_ACCESS_TOKEN the only secret. timeout-minutes: 15 (tuned in P4-03). YAML syntax checked via ruby; never run on GitHub (live check pending). Summary step simulated locally and works.
+
+### P4-03 — 0e1ef8e
+
+job_timeout_minutes() reads cleanup-feed.yml; JobTimeoutTests added (95 tests).
+Measurement: timeout-minutes before=15 after=15 decision=kept because read chain 127s; identity+quota+3 requests at full chain = 635s < 900s; worst-case covers 7 requests (5 pages); removal bound cap x timeout 3000s only if every delete hits the timeout. A killed job is safe: discovery completes before mutation, removals are single independent requests, unknown outcomes are rediscovered.
+Live measurement: pending (human) - record the real duration of the first owner-authorized Actions preview
