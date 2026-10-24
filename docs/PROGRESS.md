@@ -19,7 +19,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P2-08 Entry point, logging and local wrapper
 - [x] P2-09 Phase 2 close — push and manual checks
 - [x] P3-01 API removal and quota inspection
-- [ ] P3-02 Sequential removal with quota budget
+- [x] P3-02 Sequential removal with quota budget
 - [ ] P3-03 Exit statuses and removal mode in the entry point
 - [ ] P3-04 Tune MAX_DELETIONS_PER_RUN
 - [ ] P3-05 Phase 3 close — push and manual checks
@@ -93,3 +93,7 @@ Manual check: NOT VERIFIED (human)
 ### P3-01 — 092d3d9
 
 remove(candidate) and get_quota(identity)->Quota added; 11 tests. Interpretation: get_quota raises ResponseError on malformed data (never None since RESEARCH documents inspection); callers (P3-02) must treat any non-Auth ApiError from get_quota as unavailable. remove: ItemError for success:false and for 4xx with well-formed Graph error body not auth/throttle; UnknownOutcomeError for timeouts/transport/5xx/unparsable or mismatched body and non-error 4xx; AuthError/QuotaExceededError propagate from _classify (429 or codes 4,17,341). Only Operation.DELETE supported (ValueError otherwise). Quota remaining key is Operation.DELETE. Fixtures quota.json (usage 37/100 => remaining 63), delete_success.json (deleted_id 9000001).
+
+### P3-02 — 1e4b5cb
+
+cleanup.run now handles dry and real runs (_check_quota, _remove_all). 9 new tests. Interpretation: quota requested only if eligible non-empty; failing item deferred on QuotaExceeded/Auth, counted unknown_outcome on UnknownOutcome (rest deferred); AuthError re-raised after summary; real run with a read-only client would raise MutationBlockedError (programming error). tests/fakes.py gained fixture_api(quota=True) (me, 2 thread pages, replies, quota 63 remaining) now used by test_cleanup/test_cli. Removal order for scenario: 9000001, 7000001, 9000002, 9000003, 9000004. Output line labels: removed/failed/unknown/would remove/deferred.
