@@ -8,7 +8,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P1-01 Research access, fees, permissions and token lifecycle
 - [x] P1-02 Research content categories, removal, quota and payload contracts
 - [x] P1-03 Decide go or no-go
-- [ ] P1-04 Phase 1 close — push and manual checks
+- [x] P1-04 Phase 1 close — push and manual checks
 - [ ] P2-01 Project scaffold
 - [ ] P2-02 Configuration parsing and .env.sample
 - [ ] P2-03 Core candidate types, timestamps and eligibility
@@ -45,3 +45,8 @@ RESEARCH contracts filled. Supported: posts, replies, quotes, media/carousel (al
 ### P1-03 — 9659c04
 
 Decision: GO (criteria a-d all yes, doc-only). Unsupported categories reposts and likes omitted.
+
+### P1-04 — 42cac76
+
+Push: ok (origin build/2026-10-24). Owner reads docs/RESEARCH.md and confirms it explains whether personal cleanup is free of API fees, what works, what is unsupported, and what remains untested.
+Manual check: NOT VERIFIED (human)
