@@ -29,6 +29,8 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P4-04 README
 - [x] P4-05 Meta setup and token maintenance guide
 - [x] P4-06 Final offline checks, push and handoff checks
+- [ ] R1-01 Test main.py dry-run read-only wiring, log redaction layers and generic API error exit
+- [ ] R1-02 Test that a conflicting duplicate marks the run's discovery incomplete
 
 ## Log
 
