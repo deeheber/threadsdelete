@@ -60,3 +60,12 @@ All live measurements are pending (human). Run `uv run python -c "from tests.tes
 - Safety invariants live in `cleanup.run`: complete discovery and selection precede quota and removal; `remove` is called once per candidate and never retried; dry run builds a `read_only=True` client whose `_send` blocks any non-GET before the transport.
 - The cap counts removal attempts. Quota is the single `DELETE` operation shared by all categories.
 - Likes and reposts are listed under `Excluded:` in every report with their reason.
+
+## Round 1
+
+Review-fix round: 2 tasks done, 0 blocked (26/26 done). Test-only changes; no production code changed.
+
+- R1-01 (tests/test_cli.py, CliSafetyWiringTests): dry-run client blocks mutation, removal-mode client is not read-only, handler RedactingFilter, httpx/httpcore WARNING pin, identity read failure exits 1. Each of the four main.py mutants was checked by hand and now fails a test.
+- R1-02 (tests/test_cleanup.py): a conflicting duplicate (reply sharing a post id, different timestamp) marks discovery incomplete, no DELETE, exit FAILURE. Mutant discovery.complete=True killed.
+- Interpretation: MutationBlockedError surfaces as exit 1 through main's ApiError mapping.
+- Manual check: none.
