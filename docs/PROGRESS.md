@@ -10,7 +10,7 @@ Started: 2026-10-24T02:37:10.812Z
 - [x] P1-03 Decide go or no-go
 - [x] P1-04 Phase 1 close — push and manual checks
 - [x] P2-01 Project scaffold
-- [ ] P2-02 Configuration parsing and .env.sample
+- [x] P2-02 Configuration parsing and .env.sample
 - [ ] P2-03 Core candidate types, timestamps and eligibility
 - [ ] P2-04 API client transport, pagination, retries and redaction
 - [ ] P2-05 Category discovery and record validation
@@ -54,3 +54,7 @@ Manual check: NOT VERIFIED (human)
 ### P2-01 — 33c9852
 
 Scaffold done; tests: HelpTests.test_help_needs_no_credentials. Note: `unittest discover -s tests` imports modules top-level (tests/__init__ not loaded unless a test imports tests.fakes), as the plan anticipates. ruff/mypy strict green. .gitignore preserved existing .kukulu/implement.lock line.
+
+### P2-02 — c688aa6
+
+config.py + .env.sample + 8 tests. Interpretation: error messages never echo any value; DEFAULT_API_VERSION="v1.0"; THREADS_USER_ID validated with the digits pattern. Config keys: all ten ENV_KEYS (SPEC's nine listed + THREADS_API_VERSION counted; tuple has 10 names incl. all SPEC rows). Note: constraint no-environ-in-package matches the literal text "os.environ" even in docstrings.
