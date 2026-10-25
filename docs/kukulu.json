@@ -1,0 +1,434 @@
+{
+  "verify": [
+    "uv lock --check",
+    "uv run mypy threadsdelete main.py",
+    "uv run ruff check .",
+    "uv run ruff format --check .",
+    "uv run python -m unittest discover -s tests -v",
+    "uv run main.py --help"
+  ],
+  "extraVerify": {
+    "scripts/": [
+      "bash -n scripts/run.sh"
+    ]
+  },
+  "build": [
+    "uv run python -m compileall -q threadsdelete main.py"
+  ],
+  "baseBranch": "main",
+  "branchPrefix": "build/",
+  "maxRounds": 3,
+  "maxRoundsHard": 6,
+  "flight": "repost-removal",
+  "policies": {
+    "archive": true,
+    "finalize": "ready"
+  },
+  "mutation": {
+    "targeted": {
+      "unit": {
+        "cmd": "uv run python -m unittest {filter} -v"
+      }
+    }
+  },
+  "constraints": [
+    {
+      "id": "no-hardcoded-assumption-defaults",
+      "description": "The SPEC section 5 ASSUMPTION defaults (MAX_DELETIONS_PER_RUN, HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES, MAX_RETRY_WAIT_SECONDS) are literal numbers only in threadsdelete/config.py. Covers assignment, keyword argument, dict entry, annotated default and getenv-default shapes.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/"
+      ],
+      "exclude": [
+        "threadsdelete/config.py"
+      ],
+      "pattern": "(max_deletions_per_run|http_timeout_seconds|max_read_retries|max_retry_wait_seconds)['\"]?\\s*(?:,\\s*|=\\s*|:\\s*(?:[A-Za-z_][\\w.|\\[\\] ]*=\\s*)?)['\"]?[0-9]",
+      "flags": "i",
+      "shouldMatch": [
+        "MAX_READ_RETRIES = 3",
+        "    \"MAX_DELETIONS_PER_RUN\": 100,",
+        "client = ThreadsClient(max_read_retries=3)",
+        "value = os.environ.get(\"HTTP_TIMEOUT_SECONDS\", \"30\")",
+        "    max_retry_wait_seconds: float = 60.0",
+        "DEFAULT_MAX_DELETIONS_PER_RUN = 100"
+      ],
+      "shouldNotMatch": [
+        "        max_read_retries=config.max_read_retries,",
+        "    max_retry_wait_seconds: float",
+        "    \"MAX_READ_RETRIES\": DEFAULT_MAX_READ_RETRIES,",
+        "        if attempt >= self._max_read_retries:",
+        "ENV_KEYS = (\"DRY_RUN\", \"MAX_DELETIONS_PER_RUN\", \"HTTP_TIMEOUT_SECONDS\")"
+      ]
+    },
+    {
+      "id": "core-is-pure",
+      "description": "threadsdelete/core.py is standard-library-only selection logic: no network, environment, filesystem, logging, clock or sleep (SPEC section 3).",
+      "paths": [
+        "threadsdelete/core.py"
+      ],
+      "pattern": "^\\s*(?:import|from)\\s+(?:os|sys|time|socket|httpx|requests|urllib|pathlib|io|subprocess|shutil|asyncio|threading|logging|random)\\b|\\bopen\\(|\\bsleep\\(|\\bdatetime\\.(?:now|utcnow|today)\\(|\\bdate\\.today\\(|\\bos\\.environ\\b",
+      "shouldMatch": [
+        "import os",
+        "from time import sleep",
+        "import httpx",
+        "import logging",
+        "    now = datetime.now(UTC)",
+        "    with open(path) as fh:"
+      ],
+      "shouldNotMatch": [
+        "from datetime import UTC, datetime, timedelta",
+        "from dataclasses import dataclass, field",
+        "from enum import StrEnum",
+        "    cutoff = run_started_at - timedelta(days=days_ago)"
+      ]
+    },
+    {
+      "id": "no-wall-clock-in-package",
+      "description": "The run-start time is captured once in main.py and passed in; nothing under threadsdelete/ reads the clock (SPEC section 3).",
+      "paths": [
+        "threadsdelete/"
+      ],
+      "pattern": "\\b(?:datetime\\.(?:now|utcnow|today)|date\\.today|time\\.time|time\\.monotonic)\\(",
+      "shouldMatch": [
+        "    started = datetime.now(UTC)",
+        "    started = datetime.datetime.utcnow()",
+        "    t0 = time.time()",
+        "    t0 = time.monotonic()"
+      ],
+      "shouldNotMatch": [
+        "def run(config: Config, client: ThreadsClient, run_started_at: datetime) -> RunSummary:",
+        "    cutoff = compute_cutoff(run_started_at, config.days_ago)"
+      ]
+    },
+    {
+      "id": "no-naive-now",
+      "description": "Never create a timezone-naive current time.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "datetime\\.now\\(\\s*\\)|\\butcnow\\(",
+      "shouldMatch": [
+        "    run_started_at = datetime.now()",
+        "    run_started_at = datetime.datetime.utcnow()"
+      ],
+      "shouldNotMatch": [
+        "    run_started_at = datetime.now(UTC)",
+        "    run_started_at = datetime.now(tz=UTC)"
+      ]
+    },
+    {
+      "id": "httpx-only-in-api",
+      "description": "All HTTP goes through threadsdelete/api.py (SPEC section 4); main.py and other modules use api.Transport and ThreadsClient instead of importing an HTTP library.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/"
+      ],
+      "exclude": [
+        "threadsdelete/api.py"
+      ],
+      "pattern": "^\\s*(?:import|from)\\s+(?:httpx|requests|urllib3|urllib\\.request|http\\.client|aiohttp|socket)\\b|\\burlopen\\(",
+      "shouldMatch": [
+        "import httpx",
+        "from httpx import MockTransport",
+        "import requests",
+        "from urllib.request import urlopen",
+        "from http.client import HTTPSConnection"
+      ],
+      "shouldNotMatch": [
+        "from threadsdelete.api import ThreadsClient, Transport",
+        "from urllib.parse import urlsplit"
+      ]
+    },
+    {
+      "id": "single-http-client",
+      "description": "One maintained HTTP client (httpx); no second HTTP library anywhere in the application.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "^\\s*(?:import|from)\\s+(?:requests|urllib3|urllib\\.request|http\\.client|aiohttp)\\b",
+      "shouldMatch": [
+        "import requests",
+        "from urllib.request import Request",
+        "import aiohttp"
+      ],
+      "shouldNotMatch": [
+        "import httpx",
+        "from urllib.parse import urlsplit"
+      ]
+    },
+    {
+      "id": "sleep-only-in-api",
+      "description": "Only the read-retry loop in threadsdelete/api.py waits, through its injected sleep callable.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "exclude": [
+        "threadsdelete/api.py"
+      ],
+      "pattern": "\\bsleep\\(",
+      "shouldMatch": [
+        "    time.sleep(5)",
+        "    sleep(wait)"
+      ],
+      "shouldNotMatch": [
+        "    client = ThreadsClient(sleep=fake_sleep)",
+        "    sleep: Callable[[float], None]"
+      ]
+    },
+    {
+      "id": "no-token-in-logs",
+      "description": "The access token never reaches print or a logger call (SPEC section 3, redaction).",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "\\b(?:print|(?:logger|logging|log|_log|_logger|LOGGER)\\.(?:debug|info|warning|warn|error|exception|critical|log))\\(.*(?:[^\\w\"']access_token\\b|_access_token\\b|\\[[\"']THREADS_ACCESS_TOKEN[\"']\\])",
+      "shouldMatch": [
+        "    logger.info(\"token=%s\", config.access_token)",
+        "    print(f\"Using {self._access_token}\")",
+        "    logging.debug(\"env %s\", env[\"THREADS_ACCESS_TOKEN\"])",
+        "    logger.debug(\"token %s\", access_token)"
+      ],
+      "shouldNotMatch": [
+        "    logger.info(\"Account verified: %s\", identity.username)",
+        "    headers = {\"Authorization\": f\"Bearer {self._access_token}\"}",
+        "    logging.getLogger().addFilter(RedactingFilter([config.access_token]))",
+        "    logger.error(\"THREADS_ACCESS_TOKEN is required\")"
+      ]
+    },
+    {
+      "id": "no-token-renewal-or-app-secret",
+      "description": "Automatic token renewal is a non-goal and bootstrap-only app secrets stay out of routine cleanup (SPEC sections 2 and 5); v1 ships no refresh, exchange or app-secret code, only manual instructions in docs/META_SETUP.md.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/"
+      ],
+      "pattern": "refresh_access_token|th_refresh_token|th_exchange_token|client_secret|APP_SECRET",
+      "shouldMatch": [
+        "    url = f\"{BASE}/refresh_access_token\"",
+        "    params = {\"grant_type\": \"th_refresh_token\"}",
+        "    params = {\"grant_type\": \"th_exchange_token\"}",
+        "    secret = env[\"THREADS_APP_SECRET\"]",
+        "    params = {\"client_secret\": secret}"
+      ],
+      "shouldNotMatch": [
+        "# Tokens are replaced manually; see docs/META_SETUP.md",
+        "    access_token = config.access_token"
+      ]
+    },
+    {
+      "id": "no-post-body-field",
+      "description": "Discovery never requests the post body (text) field, so post bodies are never held or logged (SPEC section 3).",
+      "paths": [
+        "threadsdelete/"
+      ],
+      "pattern": "[\"',]\\s*text\\s*[\"',]",
+      "shouldMatch": [
+        "FIELDS = \"id,text,timestamp\"",
+        "FIELDS = (\"id\", \"text\", \"timestamp\")",
+        "    params = {\"fields\": \"id,timestamp,text\"}"
+      ],
+      "shouldNotMatch": [
+        "    body = response.text",
+        "    headers = {\"Content-Type\": \"text/plain\"}",
+        "FIELDS = \"id,timestamp,permalink,media_type\""
+      ]
+    },
+    {
+      "id": "no-url-outside-api",
+      "description": "URL literals (and therefore hosts) live only in threadsdelete/api.py, which keeps credential-bearing requests on the trusted API host.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "exclude": [
+        "threadsdelete/api.py"
+      ],
+      "pattern": "https?://",
+      "shouldMatch": [
+        "BASE = \"https://graph.threads.net/v1.0\"",
+        "    url = \"http://localhost:8080\""
+      ],
+      "shouldNotMatch": [
+        "    print(\"See README.md for setup\")",
+        "    link = candidate.permalink"
+      ]
+    },
+    {
+      "id": "no-redirects-or-insecure-tls",
+      "description": "The HTTP client never follows redirects (credentials stay on the API host) and never disables TLS verification.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "follow_redirects\\s*=\\s*True|verify\\s*=\\s*False",
+      "shouldMatch": [
+        "    httpx.Client(follow_redirects=True)",
+        "    httpx.Client(verify=False)"
+      ],
+      "shouldNotMatch": [
+        "    httpx.Client(follow_redirects=False, timeout=timeout, transport=transport)"
+      ]
+    },
+    {
+      "id": "no-environ-in-package",
+      "description": "Only main.py reads the process environment; threadsdelete/config.py parses a Mapping passed to it.",
+      "paths": [
+        "threadsdelete/"
+      ],
+      "pattern": "\\bos\\.(?:environ|getenv)\\b|^\\s*from\\s+os\\s+import\\s+.*\\b(?:environ|getenv)\\b",
+      "shouldMatch": [
+        "    token = os.environ[\"THREADS_ACCESS_TOKEN\"]",
+        "    value = os.getenv(\"DRY_RUN\")",
+        "from os import environ"
+      ],
+      "shouldNotMatch": [
+        "    config = load_config(env)",
+        "def load_config(env: Mapping[str, str]) -> Config:"
+      ]
+    },
+    {
+      "id": "tests-no-real-transport",
+      "description": "Tests are offline: they use httpx.MockTransport through tests/fakes.py, never a real transport or urlopen.",
+      "paths": [
+        "tests/"
+      ],
+      "pattern": "httpx\\.(?:HTTPTransport|AsyncHTTPTransport)\\(|\\burlopen\\(",
+      "shouldMatch": [
+        "    transport = httpx.HTTPTransport()",
+        "    urllib.request.urlopen(url)"
+      ],
+      "shouldNotMatch": [
+        "    transport = httpx.MockTransport(handler)"
+      ]
+    },
+    {
+      "id": "actions-pinned-sha",
+      "description": "Every workflow action is pinned to a full 40-character commit SHA (SPEC section 6, GitHub Actions).",
+      "paths": [
+        ".github/workflows/"
+      ],
+      "pattern": "^\\s*(?:-\\s*)?uses:\\s*['\"]?[^\\s'\"@]+@(?![0-9a-f]{40}(?:['\"\\s]|$))",
+      "shouldMatch": [
+        "      - uses: actions/checkout@v5",
+        "        uses: astral-sh/setup-uv@main",
+        "      - uses: actions/checkout@08c6903"
+      ],
+      "shouldNotMatch": [
+        "      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0",
+        "      - uses: ./.github/actions/local"
+      ]
+    },
+    {
+      "id": "cleanup-no-cancel-in-progress",
+      "description": "The cleanup workflow serializes runs with cancel-in-progress: false (SPEC section 6).",
+      "paths": [
+        ".github/workflows/cleanup-feed.yml"
+      ],
+      "pattern": "cancel-in-progress:\\s*true",
+      "shouldMatch": [
+        "  cancel-in-progress: true"
+      ],
+      "shouldNotMatch": [
+        "  cancel-in-progress: false"
+      ]
+    },
+    {
+      "id": "no-expression-in-run",
+      "description": "Settings reach shell steps through env mappings, never ${{ }} interpolated into run code (original SPEC section 6). A line containing ${{ must be a YAML key mapping whose key is not run (e.g. KEY: ${{ ... }}, if: ${{ ... }}, group: ci-${{ github.ref }}); a run: line or a bare shell line with ${{ is a hit. A key-looking line inside a multi-line run: | block is not caught: reviewer checks by reading.",
+      "paths": [
+        ".github/workflows/"
+      ],
+      "pattern": "^(?!\\s*(?:-\\s*)?(?!run:)[A-Za-z_][\\w-]*:\\s).*\\$\\{\\{",
+      "shouldMatch": [
+        "        run: echo \"${{ vars.DAYS_AGO }}\"",
+        "          uv run main.py --days ${{ inputs.days }}",
+        "      - run: echo ${{ secrets.THREADS_ACCESS_TOKEN }}",
+        "          echo \"days=${{ vars.DAYS_AGO }}\" >> \"$GITHUB_OUTPUT\""
+      ],
+      "shouldNotMatch": [
+        "          DAYS_AGO: ${{ vars.DAYS_AGO }}",
+        "          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}",
+        "    if: ${{ always() }}",
+        "          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || vars.DRY_RUN }}",
+        "        run: uv run main.py",
+        "  group: ci-${{ github.ref }}"
+      ]
+    },
+    {
+      "id": "no-secrets-in-ci",
+      "description": "Offline CI never receives cleanup credentials (SPEC section 6).",
+      "paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "pattern": "\\bsecrets\\.",
+      "shouldMatch": [
+        "          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}"
+      ],
+      "shouldNotMatch": [
+        "          DRY_RUN: \"true\""
+      ]
+    },
+    {
+      "id": "no-pull-request-target",
+      "description": "No workflow uses pull_request_target, which would expose secrets to pull-request code.",
+      "paths": [
+        ".github/workflows/"
+      ],
+      "pattern": "\\bpull_request_target\\b",
+      "shouldMatch": [
+        "  pull_request_target:",
+        "on: [push, pull_request_target]"
+      ],
+      "shouldNotMatch": [
+        "  pull_request:"
+      ]
+    },
+    {
+      "id": "no-reposted-post-id",
+      "description": "Reposts are removed by the repost record's own id only; the package never requests or reads reposted_post (SPEC section 4, Removal). Not even in a comment or docstring.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "reposted_post",
+      "shouldMatch": [
+        "_THREADS_FIELDS = \"id,timestamp,permalink,owner,media_type,is_quote_post,reposted_post\"",
+        "    original = record.get(\"reposted_post\")",
+        "    target_id = record[\"reposted_post\"][\"id\"]"
+      ],
+      "shouldNotMatch": [
+        "    target_id = record[\"id\"]",
+        "_REPOST_TYPE = \"REPOST_FACADE\"",
+        "_THREADS_FIELDS = \"id,timestamp,permalink,owner,media_type,is_quote_post\""
+      ]
+    },
+    {
+      "id": "no-unrepost-operation",
+      "description": "Operation.UNREPOST is removed; reposts map to Operation.DELETE (SPEC section 4, Quota).",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "tests/"
+      ],
+      "pattern": "\\bUNREPOST\\b|[\"']unrepost[\"']",
+      "from": "P1-01",
+      "shouldMatch": [
+        "    UNREPOST = \"unrepost\"",
+        "    Category.REPOST: Operation.UNREPOST,",
+        "        self.assertEqual(candidate.operation, \"unrepost\")"
+      ],
+      "shouldNotMatch": [
+        "    Category.REPOST: Operation.DELETE,",
+        "    UNLIKE = \"unlike\"",
+        "class Category(StrEnum):"
+      ]
+    }
+  ]
+}
