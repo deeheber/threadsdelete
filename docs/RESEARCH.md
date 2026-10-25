@@ -184,7 +184,7 @@ Classification: `media_type == "REPOST_FACADE"`. [live] `reposted_post` is `null
 Remove: [live] `DELETE /{repost-record-id}` returns `{"success": true, "deleted_id": "<id>"}`; the record then no longer exists (error 100, subcode 33) and the original post is untouched.
 Permission: `threads_basic`, `threads_delete`.
 Quota: Unknown. [live] One repost deletion left `delete_quota_usage` unchanged.
-Historical coverage: [live] reposts back to 2023-07 were returned.
+Historical coverage: [live] reposts several years old were returned.
 Evidence: https://developers.facebook.com/documentation/threads/posts/reposts ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23)
 
 ### Category: likes
@@ -223,14 +223,14 @@ Sources: https://developers.facebook.com/documentation/threads/overview ; https:
 
 The original research (2026-10-23) used no credentials. Live checks on the owner's account (2026-10-24 unless a bullet gives another date):
 
-- `GET /me/threads` returned 51 `REPOST_FACADE` records, all with `owner.id` equal to the user's ID and a `timestamp`; `reposted_post` was `null` on all of them.
+- Every `REPOST_FACADE` record returned by `GET /me/threads` had `owner.id` equal to the user's ID and a `timestamp`; `reposted_post` was `null` on all of them.
 - A new repost of a post about 15 hours old had `timestamp` set to the moment of the repost.
 - `DELETE /{id}` on one old repost (of another person's post) returned `{"success": true, "deleted_id": "<id>"}`. A follow-up GET returned error 100, subcode 33. The owner confirmed in the app that the repost was gone and the original post remained.
-- `delete_quota_usage` was 15 before and after that deletion. `threads_publishing_limit` returned `delete_quota_usage` and `delete_config` (`quota_total` 100, `quota_duration` 86400) as documented.
-- GitHub Actions runs on 2026-10-25: a `workflow_dispatch` preview (90 days) listed 30 posts, 4 quotes and 55 replies with discovery complete. A removal run (`DAYS_AGO=365`, cap 5) removed 2 posts and 3 replies with no failed or unknown outcomes and deferred the rest. `delete_quota_usage` went from 10 to 15, and stayed at 15 after the later repost deletion.
+- `delete_quota_usage` did not change after that deletion. `threads_publishing_limit` returned `delete_quota_usage` and `delete_config` (`quota_total` 100, `quota_duration` 86400) as documented.
+- GitHub Actions runs on 2026-10-25: a `workflow_dispatch` preview listed posts, quotes and replies with discovery complete. A removal run with a small cap removed posts and replies with no failed or unknown outcomes and deferred the rest. `delete_quota_usage` rose by exactly the number of posts and replies removed, and did not change after the later repost deletion.
 - The owner completed `docs/META_SETUP.md` steps 1 to 7. The resulting token could delete, so `threads_delete` was granted (enabled under the Threads use case's "Permissions and features" in the App Dashboard), and it worked through the `access_token` query parameter.
 - `GET /me?fields=id,username` returned exactly `id` and `username`.
-- `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app back to 2023-07 (text posts and reposts). `GET /me/replies` returned 68 replies back to 2024-02, all with `is_reply_owned_by_me: true`.
+- `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app, including text posts and reposts several years old. `GET /me/replies` returned replies created in the app, all with `is_reply_owned_by_me: true`.
 
 ## Untested and pending
 

@@ -16,7 +16,7 @@ These are `[live]` observations from the owner's account, already recorded in `d
 
 - `GET /me/threads` returns reposts as records with `media_type=REPOST_FACADE`.
 - `timestamp` on a `REPOST_FACADE` record is the time of the repost (the owner's action time), not the original post's time.
-- `owner.id` on a `REPOST_FACADE` record equals the authenticated user's ID. All 51 reposts on the account had `owner` and `timestamp`.
+- `owner.id` on a `REPOST_FACADE` record equals the authenticated user's ID. Every repost record on the account had `owner` and `timestamp`.
 - `reposted_post` comes back `null`, so the original post's ID is not available.
 - `DELETE /{repost-record-id}` returns `{"success": true, "deleted_id": "<repost-record-id>"}`, the same shape as post deletion. Afterwards the record no longer exists (error code 100, subcode 33) and the original post is untouched.
 - `delete_quota_usage` did not change after one repost deletion. Whether repost deletions count against the 100-per-24-hours quota is not confirmed.
