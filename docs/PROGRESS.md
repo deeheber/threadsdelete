@@ -8,7 +8,7 @@ Started: 2026-10-25T14:17:13.392Z
 - [x] P1-01 Map reposts to the delete operation
 - [x] P1-02 Discover reposts as removable candidates
 - [x] P1-03 README coverage for reposts
-- [ ] P1-04 Phase 1 close — push and manual checks
+- [x] P1-04 Phase 1 close — push and manual checks
 
 ## Log
 
@@ -25,3 +25,9 @@ Repost discovery added in api.py (SUPPORTED_CATEGORIES now includes REPOST; UNSU
 ### P1-03 — 602e2a5
 
 README updated: coverage table, ownership, cutoff, quota, category names. Docs only.
+
+### P1-04 — a221cd3
+
+Full verify green (last run after P1-03); compileall ok. Push: pushed build/2026-10-25 to origin.
+Owner, after merge: run a preview with real credentials, confirm old reposts are listed with the right dates, then run one real removal and check in Threads that the reposts are gone and the originals remain. Also confirm CI is green on the pull request.
+Manual check: NOT VERIFIED (human)
