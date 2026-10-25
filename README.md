@@ -6,7 +6,7 @@ Cleans up your own old [Threads](https://www.threads.com) content with Meta's of
 
 Feasibility findings and API contracts: [docs/RESEARCH.md](docs/RESEARCH.md). Meta app and token setup: [docs/META_SETUP.md](docs/META_SETUP.md).
 
-> Status: built and tested offline against synthetic fixtures. Nothing here has been exercised against a live account yet; the live checks are listed in `docs/RESEARCH.md` under "Untested and pending".
+> Status: tested offline against synthetic fixtures, and run live on the owner's account on 2026-10-25 through GitHub Actions (a preview, then a removal of posts and replies). Remaining live checks are in `docs/RESEARCH.md` under "Untested and pending".
 
 ## Quick start
 
@@ -73,14 +73,14 @@ The report prints the account, the UTC cutoff, the mode, one line per candidate 
 
 ## What is covered
 
-From [docs/RESEARCH.md](docs/RESEARCH.md) (documentation findings, not yet live-verified):
+From [docs/RESEARCH.md](docs/RESEARCH.md) (posts and replies are live-verified; quotes are not yet):
 
 | Content | Status |
 | --- | --- |
 | Posts, including image/video/audio, polls and carousels (the parent post only) | Removed |
 | Quote posts | Removed |
 | Your own replies | Removed |
-| Reposts | Excluded: no documented call removes a repost |
+| Reposts | Excluded for now: removal works in a live test, implementation planned (#4) |
 | Likes | Excluded: the API has no documented endpoint to list or remove likes |
 
 Nothing from other people is ever touched: every record must prove it is yours (post `owner` equals your user ID; replies must be flagged as yours and carry your username). If ownership or any timestamp is ambiguous, discovery is marked incomplete and nothing is removed.
@@ -151,7 +151,7 @@ Long-lived tokens last 60 days and this tool does not renew them. Before expiry,
 
 Reference project: [deeheber/blueskydelete](https://github.com/deeheber/blueskydelete).
 
-Built with [Kūkulu](https://kukulu.tech) ([GitHub](https://github.com/DisplaceTech/kukulu)), which planned, implemented and reviewed it from `docs/SPEC.md`. The build's plan, progress log and reviews are in [docs/flights/threadsdelete/](docs/flights/threadsdelete/).
+Built with [Kūkulu](https://kukulu.tech) ([GitHub](https://github.com/DisplaceTech/kukulu)), which planned, implemented and reviewed it from [the original spec](docs/flights/threadsdelete/SPEC.md). The build's plan, progress log and reviews are in [docs/flights/threadsdelete/](docs/flights/threadsdelete/).
 
 ## License
 

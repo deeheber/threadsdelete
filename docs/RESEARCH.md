@@ -2,7 +2,7 @@
 
 ## Summary
 
-Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported (documentation findings): posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. Unsupported: reposts (no documented removal call) and likes (no API at all). Untested: everything live, because no credentials were used; notably the `threads_delete` scope grant, reply/quote deletion, app-created versus Threads-app-created coverage, and the error code of the deletion limit (see Untested and pending).
+Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported: posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. `DELETE /{id}` is documented for posts and live-verified for posts and replies; for quotes it is inferred and not yet tested. Reposts: removal is undocumented, but a live check on 2026-10-24 showed `DELETE /{id}` removes them. Unsupported: likes (no documented list, timestamp or unlike endpoint; newer endpoints unknown). See Live observations for what has been verified and Untested and pending for what has not, notably quote deletion and the error code of the deletion limit.
 
 ## Sources
 
@@ -44,7 +44,7 @@ Retrieved 2026-10-23 with `curl` (no credentials, no token). "OK" means HTTP 200
 - [doc] `threads_delete`: required for any delete call, and (per the overview) for the `delete_quota_usage` and `delete_config` fields of `threads_publishing_limit`. Source: https://developers.facebook.com/documentation/threads/posts/delete-posts and overview.
 - [doc] `threads_read_replies`: required for GET calls to reply endpoints (`/{user-id}/replies`). Source: get-started.
 - [doc] `threads_manage_replies` (POST to reply endpoints), `threads_content_publish` (publishing), `threads_manage_insights`: not needed by this tool.
-- [doc] The authorization-window documentation lists `scope` values `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` and does not list `threads_delete`, while the delete page requires it. Whether `threads_delete` must be requested in `scope` or is granted differently is Unknown; META_SETUP must tell the owner to request `threads_basic,threads_read_replies,threads_delete` and verify the granted scopes live (pending). Source: get-started-access-tokens-and-permissions vs delete-posts (2026-10-23).
+- [doc] The authorization-window documentation lists `scope` values `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` and does not list `threads_delete`, while the delete page requires it. [live, 2026-10-24] With `threads_delete` enabled under the use case's "Permissions and features" and `threads_basic,threads_read_replies,threads_delete` requested in `scope`, the resulting token could delete (see Live observations). Whether either step alone is enough is untested. Source: get-started-access-tokens-and-permissions vs delete-posts (2026-10-23).
 - [doc] App Review is not needed for own-account use through a tester role (see above).
 - [doc] Reading `owner` is "only available on top-level posts that you own".
 
@@ -65,15 +65,15 @@ Retrieved 2026-10-23 with `curl` (no credentials, no token). "OK" means HTTP 200
 | posts (text, GIF, poll) | yes | `GET /me/threads`, `timestamp`, `DELETE /{id}` |
 | media and carousel posts | yes | same endpoint; parent post only |
 | quotes | yes | `is_quote_post` on `/me/threads`; `DELETE /{id}` |
-| replies | yes | `GET /me/replies`, `is_reply_owned_by_me`; `DELETE /{id}` (inferred, live check pending) |
-| reposts | no | enumerable (`REPOST_FACADE`) but no documented removal call |
+| replies | yes | `GET /me/replies`, `is_reply_owned_by_me`; `DELETE /{id}` (live-verified 2026-10-25) |
+| reposts | yes | `REPOST_FACADE` on `/me/threads`; `DELETE /{id}` (live-verified 2026-10-24) |
 | likes | no | no documented list, timestamp or unlike endpoint |
 
 Unsupported categories are documented here and omitted from the implementation (SPEC section 1).
 
 ## Comparison with blueskydelete
 
-blueskydelete (README and main.py read 2026-10-23, https://github.com/deeheber/blueskydelete) cleans three collections: posts, reposts and likes, filtered by age, with `DRY_RUN`, `DAYS_AGO` and `LOG_LEVEL`. Threads parity: posts yes (plus quotes, media and carousels, and replies as SPEC extras); reposts no (no documented removal); likes no (no documented API). Bluesky's age filter uses each record's own creation time, which maps to `timestamp` for Threads posts and replies. Bluesky authenticates with username and app password; Threads needs a manually replaced long-lived user token (60 days).
+blueskydelete (README and main.py read 2026-10-23, https://github.com/deeheber/blueskydelete) cleans three collections: posts, reposts and likes, filtered by age, with `DRY_RUN`, `DAYS_AGO` and `LOG_LEVEL`. Threads parity: posts yes (plus quotes, media and carousels, and replies as SPEC extras); reposts yes (live-verified 2026-10-24); likes no (no documented API). Bluesky's age filter uses each record's own creation time, which maps to `timestamp` for Threads posts and replies. Bluesky authenticates with username and app password; Threads needs a manually replaced long-lived user token (60 days).
 
 ## Contracts
 
@@ -136,7 +136,7 @@ Fields: `id,timestamp,permalink,username,is_reply,is_reply_owned_by_me` (never `
 Action timestamp field: `timestamp` (creation time of the reply; owner's own creation time).
 Ownership check: `is_reply_owned_by_me` must be `true` AND `username` must equal the identity `username`; a missing or false value aborts discovery as ambiguous ownership. (The replies list has no `owner` field.)
 Classification: Every record from `/me/replies` is a reply (`is_reply` true).
-Remove: `DELETE /{threads-media-id}` on the reply's own ID; same success body. [doc, inferred] The delete page says "a Threads post that was created by the authenticated user"; a reply is a Threads media object created through the same publishing flow. Not explicitly shown for replies: live check pending.
+Remove: `DELETE /{threads-media-id}` on the reply's own ID; same success body. [doc, inferred] The delete page says "a Threads post that was created by the authenticated user"; a reply is a Threads media object created through the same publishing flow. Not explicitly shown for replies. [live] Verified 2026-10-25: a removal run deleted three replies.
 Permission: `threads_basic`, `threads_read_replies` (read), `threads_delete` (remove).
 Quota: Shared deletion quota: 100 deletes per rolling 24 hours per profile (see Quota inspection).
 Historical coverage: [doc] Not stated. App-created vs API-created replies: Unknown (pending).
@@ -174,17 +174,17 @@ Evidence: https://developers.facebook.com/documentation/threads/retrieve-and-dis
 
 ### Category: reposts
 
-Supported: no
-Reason: Enumeration and a timestamp exist, but no documentation states a removal call for a repost. The reposts page shows only `POST /{id}/repost`; the delete page covers posts "created by the authenticated user" and never mentions reposts. A repost is a `REPOST_FACADE` object, so assuming `DELETE /{repost-id}` works would be inventing a contract. Promote to `yes` only after a live check on a disposable repost (see Untested and pending).
-Enumerate: [doc] `GET /me/threads` returns reposts as `media_type=REPOST_FACADE` with `reposted_post`.
-Fields: n/a (not implemented; records are counted as scanned and skipped)
-Action timestamp field: `timestamp` is documented as the post time; whether it is the repost time (the owner's action time) is Unknown.
-Ownership check: `owner` presence on `REPOST_FACADE` records is Unknown; not used because the category is excluded.
-Classification: `media_type == "REPOST_FACADE"` (with `reposted_post.id`).
-Remove: Unknown (no documented call).
-Permission: `threads_basic`; `threads_delete` if removal works.
-Quota: Unknown.
-Historical coverage: Unknown.
+Supported: yes [live, 2026-10-24]
+Reason: [doc] The reposts page shows only `POST /{id}/repost` and the delete page never mentions reposts, so removal is undocumented. [live] Deleting a repost record with `DELETE /{id}` worked on the owner's account (see Live observations).
+Enumerate: [doc] `GET /me/threads` returns reposts as `media_type=REPOST_FACADE`.
+Fields: `id,timestamp,permalink,owner,media_type` (the same request as posts; never `text`)
+Action timestamp field: [live] `timestamp` is the time of the repost (the owner's action time), not the original post's time.
+Ownership check: [live] `owner.id` equals the authenticated identity `id`; a missing or different `owner` aborts discovery, as for posts.
+Classification: `media_type == "REPOST_FACADE"`. [live] `reposted_post` is `null`, so the original post's ID is unavailable; remove by the repost record's own `id` only.
+Remove: [live] `DELETE /{repost-record-id}` returns `{"success": true, "deleted_id": "<id>"}`; the record then no longer exists (error 100, subcode 33) and the original post is untouched.
+Permission: `threads_basic`, `threads_delete`.
+Quota: Unknown. [live] One repost deletion left `delete_quota_usage` unchanged.
+Historical coverage: [live] reposts several years old were returned.
 Evidence: https://developers.facebook.com/documentation/threads/posts/reposts ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23)
 
 ### Category: likes
@@ -221,17 +221,22 @@ Sources: https://developers.facebook.com/documentation/threads/overview ; https:
 
 ## Live observations
 
-None. No credentials were available or used (research protocol), and no account setup or deletion was performed. Every finding above is `[doc]`.
+The original research (2026-10-23) used no credentials. Live checks on the owner's account (2026-10-24 unless a bullet gives another date):
+
+- Every `REPOST_FACADE` record returned by `GET /me/threads` had `owner.id` equal to the user's ID and a `timestamp`; `reposted_post` was `null` on all of them.
+- A new repost of a post about 15 hours old had `timestamp` set to the moment of the repost.
+- `DELETE /{id}` on one old repost (of another person's post) returned `{"success": true, "deleted_id": "<id>"}`. A follow-up GET returned error 100, subcode 33. The owner confirmed in the app that the repost was gone and the original post remained.
+- `delete_quota_usage` did not change after that deletion. `threads_publishing_limit` returned `delete_quota_usage` and `delete_config` (`quota_total` 100, `quota_duration` 86400) as documented.
+- GitHub Actions runs on 2026-10-25: a `workflow_dispatch` preview listed posts, quotes and replies with discovery complete. A removal run with a small cap removed posts and replies with no failed or unknown outcomes and deferred the rest. `delete_quota_usage` rose by exactly the number of posts and replies removed, and did not change after the later repost deletion.
+- The owner completed `docs/META_SETUP.md` steps 1 to 7. The resulting token could delete, so `threads_delete` was granted (enabled under the Threads use case's "Permissions and features" in the App Dashboard), and it worked through the `access_token` query parameter.
+- `GET /me?fields=id,username` returned exactly `id` and `username`.
+- `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app, including text posts and reposts several years old. `GET /me/replies` returned replies created in the app, all with `is_reply_owned_by_me: true`.
 
 ## Untested and pending
 
-- Whether `threads_delete` can be granted through the authorization window `scope` parameter, given it is absent from the documented scope list.
-- Whether the `access_token` query parameter is the only accepted transport (an `Authorization` header is undocumented).
-- `GET /me?fields=id,username` response shape; `GET /me/threads` and `GET /me/replies` pagination in practice (empty pages, `next` behavior).
-- Content created in the Threads app versus through the API: whether both are enumerated, and how far back.
-- Whether `DELETE /{id}` removes a reply and a quote post.
-- Whether a repost can be removed with `DELETE /{repost-id}`, whether `owner` is present on `REPOST_FACADE`, and whether its `timestamp` is the repost time (promotes reposts to supported).
-- Which error code and HTTP status the 100-per-day deletion limit raises; the not-found error for an already-deleted post; the `threads_publishing_limit` delete fields in practice.
+- Whether `DELETE /{id}` removes a quote post.
+- Whether repost deletions count against the 100-per-24-hours deletion quota (one deletion left `delete_quota_usage` unchanged; re-check for a delayed update).
+- Which error code and HTTP status the 100-per-day deletion limit raises.
 - Ghost posts: whether `/me/threads` returns them (they have a separate `ghost_posts` edge not used here).
 - Any Meta platform-terms constraint on automated personal cleanup.
 - Existence of likes endpoints newer than the 2026-08-18 changelog.

@@ -1,6 +1,6 @@
 # Meta setup and token maintenance
 
-Verified against Meta documentation on 2026-10-23; live steps pending owner verification.
+Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23).
 
 Every command uses placeholders: never paste real IDs, secrets or tokens into this file, the README, an issue or a commit. Facts and sources are in [RESEARCH.md](RESEARCH.md); items it marks Unknown are called out below.
 
@@ -17,7 +17,7 @@ This tool uses an app in development mode with **you** as the only Threads Teste
 
 1. In the App Dashboard choose Create app and select the use case for accessing the Threads API.
 2. Open App settings, Basic. There are two sets of IDs and secrets; use the **Threads app ID** and **Threads app secret**, not the regular ones. Call them `<APP_ID>` and `<APP_SECRET>` below.
-3. Under the Threads use case, enable the permissions `threads_basic`, `threads_read_replies` and `threads_delete`.
+3. Under the Threads use case, open **Permissions and features** and enable `threads_basic`, `threads_read_replies` and `threads_delete`.
 4. Add a redirect callback URL in the Threads use case settings. Threads does not accept `localhost`. Use any HTTPS URL you control or a placeholder such as `https://example.com/callback/`; you only need to read the `code` parameter from the browser's address bar after approval, so the page itself does not have to load. The value must match exactly (Meta may add a trailing slash). Call it `<REDIRECT_URI>`.
 
 ## 3. Testers (own-account role)
@@ -34,7 +34,7 @@ This tool uses an app in development mode with **you** as the only Threads Teste
 | `threads_read_replies` | Listing your own replies. |
 | `threads_delete` | Removing content and reading the deletion quota. |
 
-Unverified: Meta's authorization-window documentation lists `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` as `scope` values and does not list `threads_delete`, while the delete documentation requires it. Request all three in `scope` as shown below; if the consent screen does not offer `threads_delete`, enable it for the app in the dashboard first.
+Meta's authorization-window documentation does not list `threads_delete` as a `scope` value, but the delete documentation requires it. Verified 2026-10-24: with `threads_delete` enabled under the use case's **Permissions and features** (step 2.3) and all three permissions requested in `scope` as shown below, the resulting token could delete.
 
 ## 5. Token acquisition and exchange (manual)
 
@@ -102,4 +102,4 @@ Remove the app under Threads Account settings, Website permissions, or remove yo
 
 ## 10. What is not verified yet
 
-All steps above come from documentation, not from a live account. Still to confirm by hand (see RESEARCH, "Untested and pending"): the `threads_delete` scope request, `GET /me`, which content created in the Threads app is returned, deletion of replies and quote posts, and the exact error returned when the deletion quota is reached.
+Steps 8 (renewal) and 9 (revocation) are from documentation only. Still to confirm by hand (see RESEARCH, "Untested and pending"): deletion of quote posts, and the error returned when the deletion quota is reached.
