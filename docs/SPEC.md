@@ -8,7 +8,7 @@ threadsdelete already works: it removes the owner's own posts, quotes and replie
 
 This flight adds one thing: removing the owner's **reposts**. Reposts are excluded today because no documented call removed them. A live test on 2026-10-24 (issue #4) showed removal works.
 
-Keep every rule in `CLAUDE.md`. In particular: dry run makes no mutation, discovery completes before any removal, removals are never retried, an unknown outcome is never success, credentials are redacted, tests stay offline with synthetic fixtures, and no live account actions happen during the build.
+Keep every rule in `CLAUDE.md`. No live account actions during the build.
 
 ## 2. Live findings (2026-10-24)
 
@@ -16,7 +16,7 @@ These are `[live]` observations from the owner's account; record them in `docs/R
 
 - `GET /me/threads` returns reposts as records with `media_type=REPOST_FACADE`.
 - `timestamp` on a `REPOST_FACADE` record is the time of the repost (the owner's action time), not the original post's time.
-- `owner.id` on a `REPOST_FACADE` record equals the authenticated user's ID.
+- `owner.id` on a `REPOST_FACADE` record equals the authenticated user's ID. All 51 reposts on the account had `owner` and `timestamp`.
 - `reposted_post` comes back `null`, so the original post's ID is not available.
 - `DELETE /{repost-record-id}` returns `{"success": true, "deleted_id": "<repost-record-id>"}`, the same shape as post deletion. Afterwards the record no longer exists (error code 100, subcode 33) and the original post is untouched.
 - `delete_quota_usage` did not change after one repost deletion. Whether repost deletions count against the 100-per-24-hours quota is not confirmed.
@@ -29,12 +29,11 @@ These are `[live]` observations from the owner's account; record them in `docs/R
 ## 4. Behavior
 
 - **Category:** `repost` becomes a supported category. It is no longer printed as an `Excluded:` line; `like` still is.
-- **Discovery:** classify `REPOST_FACADE` records from the existing `me/threads` fetch as `Category.REPOST` candidates. Request `owner` for them as for posts. A repost whose `owner.id` is missing or differs from the authenticated user aborts discovery as ambiguous ownership, like posts. A malformed `timestamp` aborts discovery.
+- **Discovery:** classify `REPOST_FACADE` records from the existing `me/threads` fetch (which already requests `owner`) as `Category.REPOST` candidates. A repost whose `owner.id` is missing or differs from the authenticated user aborts discovery as ambiguous ownership, like posts. A malformed `timestamp` aborts discovery.
 - **Action time:** a repost's `timestamp` is its action time for the cutoff.
 - **Counting:** repost records count under `repost` `scanned`, not `post`. The summary gets a `repost:` line with the same fields as the other categories.
 - **Removal:** `DELETE /{id}` on the repost record's own `id`, with the same success-body validation, error classification and no-retry rule as posts. Never use `reposted_post` or any other ID.
 - **Quota:** reposts share the delete quota and `MAX_DELETIONS_PER_RUN` with posts (map `Category.REPOST` to `Operation.DELETE`). This is the safe choice while the quota question is open. Remove `Operation.UNREPOST` if nothing else uses it.
-- **Dry run:** reposts appear as `would remove` lines with their permalinks, and no request other than GET is sent.
 
 ## 5. Changes
 
@@ -42,9 +41,8 @@ These are `[live]` observations from the owner's account; record them in `docs/R
 - `threadsdelete/core.py`: `OPERATION_FOR` mapping for reposts.
 - `docs/RESEARCH.md`: change "Category: reposts" to `Supported: yes` with the section 2 findings labeled `[live]` and dated, and update the summary and coverage table.
 - `README.md`: "What is covered" table and any text saying reposts are excluded.
-- `CLAUDE.md`: the source-of-truth line should point to this spec and to the archived original.
 - Tests and fixtures:
-  - give the synthetic repost record in the fixtures an `owner`;
+  - in `tests/fixtures/threads_page2.json`, give repost `9000005` an `owner` and set `reposted_post` to `null` to match the live data. It is newer than the 90-day cutoff, so it stays ineligible in existing tests; add an eligible repost where a test needs one;
   - update the tests that expect reposts to be skipped and counted under `post`;
   - add tests for repost discovery, ownership failure, cutoff by repost time, removal success, and dry run sending no DELETE;
   - check that the expected counts in preview and removal tests include the `repost` line.
@@ -53,6 +51,5 @@ These are `[live]` observations from the owner's account; record them in `docs/R
 
 - All commands in `CLAUDE.md` → Commands pass, and CI is green.
 - A preview against the fixtures lists eligible reposts as `would remove`, and the summary shows a `repost:` line.
-- No test or code path deletes by anything other than a repost record's own `id`.
 
 Manual check (owner, after merge): run a preview with real credentials, confirm old reposts are listed with the right dates, then run one real removal and check in Threads that the reposts are gone and the originals remain.
