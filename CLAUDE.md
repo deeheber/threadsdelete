@@ -4,6 +4,8 @@ Personal Threads cleanup tool using Meta's official API, locally or weekly throu
 
 Behavior: `docs/SPEC.md` overrides the original `docs/flights/threadsdelete/SPEC.md`; both override `docs/PLAN.md` during a flight, then code comments. "SPEC section N" means the original spec. API facts: `docs/RESEARCH.md` § Contracts overrides SPEC; SPEC wins on behavior.
 
+Configuration is the five settings in README § Settings. Log level, API version, timeout and retry values are internal constants in `threadsdelete/config.py`. This overrides SPEC section 5 and the `LOG_LEVEL` rule in section 2 (issue #6).
+
 Other flight files are archived decision history, except the current constraint rules named below. Check current code before relying on them.
 
 ## Principles
