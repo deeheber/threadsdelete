@@ -9,7 +9,7 @@ Started: 2026-10-25T14:17:13.392Z
 - [x] P1-02 Discover reposts as removable candidates
 - [x] P1-03 README coverage for reposts
 - [x] P1-04 Phase 1 close — push and manual checks
-- [ ] R1-01 Test that REPOST_FACADE wins over the quote flag in classification
+- [x] R1-01 Test that REPOST_FACADE wins over the quote flag in classification
 
 ## Log
 
@@ -32,3 +32,7 @@ README updated: coverage table, ownership, cutoff, quota, category names. Docs o
 Full verify green (last run after P1-03); compileall ok. Push: pushed build/2026-10-25 to origin.
 Owner, after merge: run a preview with real credentials, confirm old reposts are listed with the right dates, then run one real removal and check in Threads that the reposts are gone and the originals remain. Also confirm CI is green on the pull request.
 Manual check: NOT VERIFIED (human)
+
+### R1-01 — 663557f
+
+Added tests/test_discovery.py::ThreadsEdgeTests::test_repost_facade_wins_over_quote_flag. Manually swapped the if/elif in api.py: test fails (mutant killed); api.py restored unchanged. kukulu_mutate not available as a tool, so mutation checked by hand. No interpretation choices.
