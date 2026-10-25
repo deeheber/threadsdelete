@@ -1,4 +1,6 @@
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -38,16 +40,47 @@ class CleanupWorkflowTests(unittest.TestCase):
         self.assertEqual(mapping["THREADS_ACCESS_TOKEN"], "${{ secrets.THREADS_ACCESS_TOKEN }}")
         for key, value in mapping.items():
             if key == "DRY_RUN":
-                self.assertIn("github.event_name == 'workflow_dispatch'", value)
-                self.assertTrue(value.endswith("|| vars.DRY_RUN }}"))
+                self.assertEqual(
+                    value,
+                    "${{ (github.event_name == 'workflow_dispatch' && "
+                    "inputs.dry_run == 'true') && 'true' || vars.DRY_RUN }}",
+                )
             elif key != "THREADS_ACCESS_TOKEN":
                 self.assertEqual(value, f"${{{{ vars.{key} }}}}", key)
+        self.assertEqual(set(mapping), set(config.ENV_KEYS))
         self.assertEqual(CLEANUP.count("secrets."), 1)
 
     def test_cleanup_uses_same_entry_point_and_preserves_status(self) -> None:
-        self.assertIn("run: uv run main.py 2>&1 | tee cleanup.log", CLEANUP)
         run_step = CLEANUP.split("- name: Run cleanup")[1].split("- name:")[0]
         self.assertIn("shell: bash", run_step)
+        commands = re.findall(r"(?m)^\s+run: (.+)$", run_step)
+        self.assertEqual(len(commands), 1)
+        command = commands[0]
+        self.assertIn("uv run main.py", command)
+        for status in (0, 1, 2, 3):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
+                result = subprocess.run(
+                    [
+                        "bash",
+                        "--noprofile",
+                        "--norc",
+                        "-e",
+                        "-o",
+                        "pipefail",
+                        "-c",
+                        f"uv() {{ printf 'synthetic cleanup output\\n'; return {status}; }}\n"
+                        + command,
+                    ],
+                    cwd=directory,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertIn("synthetic cleanup output", result.stdout)
+                self.assertIn(
+                    "synthetic cleanup output", Path(directory, "cleanup.log").read_text()
+                )
         summary_step = CLEANUP.split("- name: Write summary")[1]
         self.assertIn("if: always()", summary_step)
         self.assertIn("GITHUB_STEP_SUMMARY", summary_step)

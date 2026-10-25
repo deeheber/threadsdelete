@@ -2,7 +2,9 @@
 
 ## Summary
 
-Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported: posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. `DELETE /{id}` is documented for posts and live-verified for posts, quotes and replies. Reposts: removal is undocumented, but a live check on 2026-10-24 showed `DELETE /{id}` removes them. Unsupported: likes (no documented list, timestamp or unlike endpoint; newer endpoints unknown). See Live observations for what has been verified and Untested and pending for what has not, notably the error code of the deletion limit.
+Own-account cleanup needs no App Review through a Threads Tester role, and no API fee is documented. Posts, media, carousels, quotes and replies can be listed with timestamps and deleted under a 100-per-24-hours quota. Repost deletion is undocumented but worked in a live check on 2026-10-24. Likes remain unsupported: no documented list, action timestamp or unlike endpoint was found.
+
+See [Live observations](#live-observations) for verification and [Untested and pending](#untested-and-pending) for open questions, including the deletion-limit error.
 
 ## Sources
 
@@ -80,7 +82,7 @@ blueskydelete (README and main.py read 2026-10-23, https://github.com/deeheber/b
 ### API host and version
 
 - [doc] Host `graph.threads.com`; the overview states the API "can be accessed by either graph.threads.com or graph.threads.net". Every current example uses `https://graph.threads.com/v1.0/...`. Use `graph.threads.com` as `API_HOST`.
-- [doc] Version `v1.0`: default for `THREADS_API_VERSION`. The path form is `https://graph.threads.com/{version}/{path}`. Source: all example requests, e.g. https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23). No newer version string is documented in the pages read.
+- [doc] Version `v1.0`: internal `API_VERSION` constant in `threadsdelete/config.py`. The path form is `https://graph.threads.com/{version}/{path}`. Source: all example requests, e.g. https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23). No newer version string is documented in the pages read.
 
 ### Authentication transport
 
@@ -114,8 +116,6 @@ Sources: https://developers.facebook.com/docs/graph-api/guides/error-handling (2
 
 ### Category: posts
 
-Supported: yes
-Reason: n/a
 Enumerate: `GET /me/threads` with `fields=...&limit=100`, then `after=<cursor>`; no `since`/`until` (filtering happens locally).
 Fields: `id,timestamp,permalink,owner,media_type,is_quote_post` (never `text`; `reposted_post` is never requested)
 Action timestamp field: `timestamp` (creation time, ISO 8601 `2023-10-17T05:42:03+0000`); this is the owner's own creation time.
@@ -129,8 +129,6 @@ Evidence: https://developers.facebook.com/documentation/threads/retrieve-and-dis
 
 ### Category: replies
 
-Supported: yes
-Reason: n/a
 Enumerate: `GET /me/replies` with `fields=...&limit=100`, then `after=<cursor>`.
 Fields: `id,timestamp,permalink,username,is_reply,is_reply_owned_by_me` (never `text`)
 Action timestamp field: `timestamp` (creation time of the reply; owner's own creation time).
@@ -138,38 +136,24 @@ Ownership check: `is_reply_owned_by_me` must be `true` AND `username` must equal
 Classification: Every record from `/me/replies` is a reply (`is_reply` true).
 Remove: `DELETE /{threads-media-id}` on the reply's own ID; same success body. [doc, inferred] The delete page says "a Threads post that was created by the authenticated user"; a reply is a Threads media object created through the same publishing flow. Not explicitly shown for replies. [live] Verified 2026-10-25: a removal run deleted three replies.
 Permission: `threads_basic`, `threads_read_replies` (read), `threads_delete` (remove).
-Quota: Shared deletion quota: 100 deletes per rolling 24 hours per profile (see Quota inspection).
+Quota: see [Quota inspection](#quota-inspection).
 Historical coverage: [doc] Not stated. App-created vs API-created replies: Unknown (pending).
 Evidence: https://developers.facebook.com/documentation/threads/retrieve-and-manage-replies/retrieve-replies ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23)
 
 ### Category: quotes
 
-Supported: yes
-Reason: n/a
-Enumerate: `GET /me/threads` with `fields=...&limit=100`, then `after=<cursor>`; no `since`/`until` (filtering happens locally).
-Fields: `id,timestamp,permalink,owner,media_type,is_quote_post` (the same request as posts; never `text`)
-Action timestamp field: `timestamp` (creation time; owner's own).
-Ownership check: `owner.id` must equal the identity `id` (as for posts).
+Uses the [post contract](#category-posts) for enumeration, fields, action time, ownership, permissions and quota.
 Classification: Record from `/me/threads` with `is_quote_post` true and `media_type` not `REPOST_FACADE`.
 Remove: `DELETE /{threads-media-id}`; success body `{"success": true, "deleted_id": "<id>"}`. [doc, inferred] a quote post is created by the owner through the normal publishing flow (`quote_post_id` on the container), so it is the owner's post. [live] Verified: `DELETE` on an owned quote returned the success body and a follow-up GET returned error 100, subcode 33.
-Permission: `threads_basic`, `threads_delete`.
-Quota: Shared deletion quota: 100 deletes per rolling 24 hours per profile (see Quota inspection).
-Historical coverage: [doc] Not stated beyond the `since` lower bound `1688540400` (2023-07-05, Threads launch), so everything since launch is nominally reachable. Whether content created in the Threads app (not through the API) is returned is Unknown (pending live check); the documentation describes the endpoint as returning "all threads created by a user".
+Historical coverage: [doc] As for posts: launch bound `1688540400` (2023-07-05, Threads launch); app-created content was Unknown pending live check. See Live observations for later findings.
 Evidence: https://developers.facebook.com/documentation/threads/posts/quote-posts ; https://developers.facebook.com/documentation/threads/retrieve-and-discover-posts/retrieve-posts ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23)
 
 ### Category: media and carousel posts
 
-Supported: yes
-Reason: n/a
-Enumerate: `GET /me/threads` with `fields=...&limit=100`, then `after=<cursor>`; no `since`/`until` (filtering happens locally).
-Fields: `id,timestamp,permalink,owner,media_type,is_quote_post` (the same request as posts; never `text`); `children` is not requested
-Action timestamp field: `timestamp` of the parent post (creation time; owner's own).
-Ownership check: `owner.id` must equal the identity `id`.
+Uses the [post contract](#category-posts) for enumeration, fields, action time, ownership, permissions and quota. `children` is not requested.
 Classification: Top-level record whose `media_type` is `IMAGE`, `VIDEO`, `AUDIO` or `CAROUSEL_ALBUM` (and not a quote/repost). The parent ID is the only candidate; carousel children are never enumerated or deleted separately.
 Remove: `DELETE /{threads-media-id}`; success body `{"success": true, "deleted_id": "<id>"}`. Deleting the parent removes the carousel.
-Permission: `threads_basic`, `threads_delete`.
-Quota: Shared deletion quota: 100 deletes per rolling 24 hours per profile (see Quota inspection).
-Historical coverage: [doc] Not stated beyond the `since` lower bound `1688540400` (2023-07-05, Threads launch), so everything since launch is nominally reachable. Whether content created in the Threads app (not through the API) is returned is Unknown (pending live check); the documentation describes the endpoint as returning "all threads created by a user".
+Historical coverage: [doc] As for posts: launch bound `1688540400` (2023-07-05, Threads launch); app-created content was Unknown pending live check. See Live observations for later findings.
 Evidence: https://developers.facebook.com/documentation/threads/retrieve-and-discover-posts/retrieve-posts ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23) ; https://developers.facebook.com/documentation/threads/reference/media-retrieval
 
 ### Category: reposts
@@ -177,12 +161,11 @@ Evidence: https://developers.facebook.com/documentation/threads/retrieve-and-dis
 Supported: yes [live, 2026-10-24]
 Reason: [doc] The reposts page shows only `POST /{id}/repost` and the delete page never mentions reposts, so removal is undocumented. [live] Deleting a repost record with `DELETE /{id}` worked on the owner's account (see Live observations).
 Enumerate: [doc] `GET /me/threads` returns reposts as `media_type=REPOST_FACADE`.
-Fields: `id,timestamp,permalink,owner,media_type,is_quote_post` (the same request as posts; never `text`)
+Fields and permissions: as for [posts](#category-posts).
 Action timestamp field: [live] `timestamp` is the time of the repost (the owner's action time), not the original post's time.
 Ownership check: [live] `owner.id` equals the authenticated identity `id`; a missing or different `owner` aborts discovery, as for posts.
 Classification: `media_type == "REPOST_FACADE"`. [live] `reposted_post` is `null`, so the original post's ID is unavailable; remove by the repost record's own `id` only.
 Remove: [live] `DELETE /{repost-record-id}` returns `{"success": true, "deleted_id": "<id>"}`; the record then no longer exists (error 100, subcode 33) and the original post is untouched.
-Permission: `threads_basic`, `threads_delete`.
 Quota: [live] Shared deletion quota, as for posts: a run that removed several reposts raised `delete_quota_usage` by exactly that number. (An earlier single deletion seemed to leave it unchanged, most likely a delayed update.)
 Historical coverage: [live] reposts several years old were returned.
 Evidence: https://developers.facebook.com/documentation/threads/posts/reposts ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23)
@@ -191,15 +174,7 @@ Evidence: https://developers.facebook.com/documentation/threads/posts/reposts ; 
 
 Supported: no
 Reason: No documented endpoint lists the owner's likes, returns the time they were liked, or removes a like. The Threads reference pages (user, media-retrieval, reply-management, posts, changelog as of 2026-08-18) contain no likes edge or unlike call. Scraping or unofficial APIs are forbidden by SPEC section 1.
-Enumerate: Unknown (none documented).
-Fields: n/a
-Action timestamp field: Unknown (the owner's like time is not exposed).
-Ownership check: n/a
-Classification: n/a
-Remove: Unknown (none documented).
-Permission: Unknown.
-Quota: Unknown.
-Historical coverage: Unknown.
+Enumeration, action time, removal, permissions, quota and historical coverage: Unknown.
 Evidence: https://developers.facebook.com/documentation/threads/reference/user ; https://developers.facebook.com/documentation/threads/reference/media-retrieval ; https://developers.facebook.com/documentation/threads/changelog (2026-10-23)
 
 ### Removal

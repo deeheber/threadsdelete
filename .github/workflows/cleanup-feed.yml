@@ -40,12 +40,7 @@ jobs:
           THREADS_USER_ID: ${{ vars.THREADS_USER_ID }}
           DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true') && 'true' || vars.DRY_RUN }}
           DAYS_AGO: ${{ vars.DAYS_AGO }}
-          LOG_LEVEL: ${{ vars.LOG_LEVEL }}
-          THREADS_API_VERSION: ${{ vars.THREADS_API_VERSION }}
           MAX_DELETIONS_PER_RUN: ${{ vars.MAX_DELETIONS_PER_RUN }}
-          HTTP_TIMEOUT_SECONDS: ${{ vars.HTTP_TIMEOUT_SECONDS }}
-          MAX_READ_RETRIES: ${{ vars.MAX_READ_RETRIES }}
-          MAX_RETRY_WAIT_SECONDS: ${{ vars.MAX_RETRY_WAIT_SECONDS }}
       - name: Write summary
         if: always()
         shell: bash

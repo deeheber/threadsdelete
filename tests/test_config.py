@@ -19,12 +19,7 @@ class DefaultsTests(unittest.TestCase):
             cfg = load_config(source)
             self.assertIs(cfg.dry_run, True)
             self.assertEqual(cfg.days_ago, config.DEFAULT_DAYS_AGO)
-            self.assertEqual(cfg.log_level, config.DEFAULT_LOG_LEVEL)
-            self.assertEqual(cfg.api_version, config.DEFAULT_API_VERSION)
             self.assertEqual(cfg.max_deletions_per_run, config.DEFAULT_MAX_DELETIONS_PER_RUN)
-            self.assertEqual(cfg.http_timeout_seconds, config.DEFAULT_HTTP_TIMEOUT_SECONDS)
-            self.assertEqual(cfg.max_read_retries, config.DEFAULT_MAX_READ_RETRIES)
-            self.assertEqual(cfg.max_retry_wait_seconds, config.DEFAULT_MAX_RETRY_WAIT_SECONDS)
 
     def test_booleans_accept_only_true_false_any_case(self) -> None:
         self.assertIs(load_config(env(DRY_RUN="TRUE")).dry_run, True)
@@ -40,15 +35,13 @@ class DefaultsTests(unittest.TestCase):
                 env(
                     DRY_RUN="maybe",
                     DAYS_AGO="ninety",
-                    LOG_LEVEL="LOUD",
-                    THREADS_API_VERSION="1.0",
                     THREADS_USER_ID="abc",
                 )
             )
         text = "\n".join(raised.exception.problems)
-        for key in ("DRY_RUN", "DAYS_AGO", "LOG_LEVEL", "THREADS_API_VERSION", "THREADS_USER_ID"):
+        for key in ("DRY_RUN", "DAYS_AGO", "THREADS_USER_ID"):
             self.assertIn(key, text)
-        self.assertEqual(len(raised.exception.problems), 5)
+        self.assertEqual(len(raised.exception.problems), 3)
 
     def test_missing_required_keys_are_errors(self) -> None:
         with self.assertRaises(ConfigError) as raised:
@@ -57,7 +50,7 @@ class DefaultsTests(unittest.TestCase):
         self.assertIn("THREADS_ACCESS_TOKEN", text)
         self.assertIn("THREADS_USER_ID", text)
 
-    def test_integer_and_float_bounds(self) -> None:
+    def test_integer_bounds(self) -> None:
         for key, bad in (
             ("DAYS_AGO", "-1"),
             ("DAYS_AGO", "+5"),
@@ -65,10 +58,6 @@ class DefaultsTests(unittest.TestCase):
             ("DAYS_AGO", "1.0"),
             ("DAYS_AGO", str(config.MAX_DAYS_AGO + 1)),
             ("MAX_DELETIONS_PER_RUN", "-3"),
-            ("MAX_READ_RETRIES", "2.5"),
-            ("HTTP_TIMEOUT_SECONDS", "0"),
-            ("HTTP_TIMEOUT_SECONDS", "1e2"),
-            ("MAX_RETRY_WAIT_SECONDS", "-1"),
         ):
             with self.assertRaises(ConfigError, msg=f"{key}={bad}"):
                 load_config(env(**{key: bad}))
@@ -76,20 +65,11 @@ class DefaultsTests(unittest.TestCase):
             env(
                 DAYS_AGO="0",
                 MAX_DELETIONS_PER_RUN="0",
-                MAX_READ_RETRIES="0",
-                MAX_RETRY_WAIT_SECONDS="0",
-                HTTP_TIMEOUT_SECONDS="0.5",
             )
         )
         self.assertEqual(cfg.days_ago, 0)
         self.assertEqual(cfg.max_deletions_per_run, 0)
-        self.assertEqual(cfg.max_read_retries, 0)
-        self.assertEqual(cfg.max_retry_wait_seconds, 0.0)
-        self.assertEqual(cfg.http_timeout_seconds, 0.5)
         self.assertEqual(load_config(env(DAYS_AGO=str(config.MAX_DAYS_AGO))).days_ago, 36500)
-
-    def test_log_level_is_case_insensitive_and_uppercased(self) -> None:
-        self.assertEqual(load_config(env(LOG_LEVEL="debug")).log_level, "DEBUG")
 
     def test_error_messages_and_repr_never_contain_token(self) -> None:
         cfg = load_config(env())
@@ -118,12 +98,7 @@ class EnvSampleTests(unittest.TestCase):
         cfg = load_config({**BASE, **non_secret})
         self.assertIs(cfg.dry_run, config.DEFAULT_DRY_RUN)
         self.assertEqual(cfg.days_ago, config.DEFAULT_DAYS_AGO)
-        self.assertEqual(cfg.log_level, config.DEFAULT_LOG_LEVEL)
-        self.assertEqual(cfg.api_version, config.DEFAULT_API_VERSION)
         self.assertEqual(cfg.max_deletions_per_run, config.DEFAULT_MAX_DELETIONS_PER_RUN)
-        self.assertEqual(cfg.http_timeout_seconds, config.DEFAULT_HTTP_TIMEOUT_SECONDS)
-        self.assertEqual(cfg.max_read_retries, config.DEFAULT_MAX_READ_RETRIES)
-        self.assertEqual(cfg.max_retry_wait_seconds, config.DEFAULT_MAX_RETRY_WAIT_SECONDS)
 
 
 if __name__ == "__main__":

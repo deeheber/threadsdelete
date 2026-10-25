@@ -86,33 +86,33 @@ def report() -> None:
     rows = [
         (
             "default",
-            config.DEFAULT_HTTP_TIMEOUT_SECONDS,
-            config.DEFAULT_MAX_READ_RETRIES,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.HTTP_TIMEOUT_SECONDS,
+            config.MAX_READ_RETRIES,
+            config.MAX_RETRY_WAIT_SECONDS,
         ),
         (
             "fewer retries",
-            config.DEFAULT_HTTP_TIMEOUT_SECONDS,
+            config.HTTP_TIMEOUT_SECONDS,
             2,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.MAX_RETRY_WAIT_SECONDS,
         ),
         (
             "more retries",
-            config.DEFAULT_HTTP_TIMEOUT_SECONDS,
+            config.HTTP_TIMEOUT_SECONDS,
             5,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.MAX_RETRY_WAIT_SECONDS,
         ),
         (
             "short timeout",
             15.0,
-            config.DEFAULT_MAX_READ_RETRIES,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.MAX_READ_RETRIES,
+            config.MAX_RETRY_WAIT_SECONDS,
         ),
         (
             "long timeout",
             60.0,
-            config.DEFAULT_MAX_READ_RETRIES,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.MAX_READ_RETRIES,
+            config.MAX_RETRY_WAIT_SECONDS,
         ),
     ]
     print(f"Job timeout assumed: {job_timeout_minutes()} min ({job_timeout_minutes() * 60} s)")
@@ -126,9 +126,9 @@ def report() -> None:
     print()
     job_seconds = job_timeout_minutes() * 60
     chain = measure_read_chain(
-        config.DEFAULT_HTTP_TIMEOUT_SECONDS,
-        config.DEFAULT_MAX_READ_RETRIES,
-        config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+        config.HTTP_TIMEOUT_SECONDS,
+        config.MAX_READ_RETRIES,
+        config.MAX_RETRY_WAIT_SECONDS,
     )["worst_case_seconds"]
     print(f"Job budget {job_seconds} s; one fully retried read chain {chain:.0f} s")
     print("Upper bound if every request needs its whole retry chain (identity + quota + N pages)")
@@ -138,7 +138,7 @@ def report() -> None:
         print(f"{pages:>5} {2 + pages:>9} {bound:>14.0f}  {'yes' if bound < job_seconds else 'no'}")
     fits = int(job_seconds // chain)
     print(f"Requests covered when every one needs its whole chain: {fits} (pages: {fits - 2})")
-    removal = config.DEFAULT_MAX_DELETIONS_PER_RUN * config.DEFAULT_HTTP_TIMEOUT_SECONDS
+    removal = config.DEFAULT_MAX_DELETIONS_PER_RUN * config.HTTP_TIMEOUT_SECONDS
     print(f"Removal upper bound (cap x timeout, no retries): {removal:.0f} s")
     print()
     print(f"Weekly drain (documented delete quota: {DOCUMENTED_DELETE_QUOTA} per 24 h)")
@@ -160,12 +160,12 @@ def report() -> None:
 class ReadChainBudgetTests(unittest.TestCase):
     def test_read_chain_attempts_and_waits_are_bounded(self) -> None:
         result = measure_read_chain(
-            config.DEFAULT_HTTP_TIMEOUT_SECONDS,
-            config.DEFAULT_MAX_READ_RETRIES,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.HTTP_TIMEOUT_SECONDS,
+            config.MAX_READ_RETRIES,
+            config.MAX_RETRY_WAIT_SECONDS,
         )
-        self.assertEqual(result["attempts"], config.DEFAULT_MAX_READ_RETRIES + 1)
-        self.assertLessEqual(result["max_single_sleep"], config.DEFAULT_MAX_RETRY_WAIT_SECONDS)
+        self.assertEqual(result["attempts"], config.MAX_READ_RETRIES + 1)
+        self.assertLessEqual(result["max_single_sleep"], config.MAX_RETRY_WAIT_SECONDS)
 
 
 class JobTimeoutTests(unittest.TestCase):
@@ -174,11 +174,11 @@ class JobTimeoutTests(unittest.TestCase):
         self.assertGreater(minutes, 0)
         self.assertLessEqual(minutes, 360)
 
-    def test_job_covers_identity_quota_and_a_page_per_category(self) -> None:
+    def test_read_budget_covers_identity_quota_and_a_page_per_category(self) -> None:
         chain = measure_read_chain(
-            config.DEFAULT_HTTP_TIMEOUT_SECONDS,
-            config.DEFAULT_MAX_READ_RETRIES,
-            config.DEFAULT_MAX_RETRY_WAIT_SECONDS,
+            config.HTTP_TIMEOUT_SECONDS,
+            config.MAX_READ_RETRIES,
+            config.MAX_RETRY_WAIT_SECONDS,
         )["worst_case_seconds"]
         categories = 3  # posts/quotes share one edge; replies another: 3 is a safe upper bound
         self.assertLess((2 + categories) * chain, job_timeout_minutes() * 60)

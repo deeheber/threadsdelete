@@ -1,11 +1,15 @@
 # threadsdelete
 
-Personal Threads cleanup tool (official Meta Threads API only) that removes the owner's own content by age, locally and from a weekly GitHub Actions cron. Source of truth: `docs/flights/threadsdelete/SPEC.md` (the original build) plus `docs/SPEC.md` (the current change, which wins where they differ); both win over `docs/PLAN.md` (during a flight), which wins over code comments. "SPEC section N" references in code and `docs/RESEARCH.md` mean the original spec. Everything else under `docs/flights/<slug>/` (plans, progress logs, reviews, summaries), except the current rule file named under Constraints, is decision history: it explains why the code is the way it is, but it may be out of date, so check the current code before relying on it.
+Personal Threads cleanup tool using Meta's official API, locally or weekly through GitHub Actions.
+
+Behavior: `docs/SPEC.md` overrides the original `docs/flights/threadsdelete/SPEC.md`; both override `docs/PLAN.md` during a flight, then code comments. "SPEC section N" means the original spec. API facts: `docs/RESEARCH.md` § Contracts overrides SPEC; SPEC wins on behavior.
+
+Other flight files are archived decision history, except the current constraint rules named below. Check current code before relying on them.
 
 ## Principles
 
 - [ ] Ruff lint + format and mypy (`strict`, untyped defs rejected) pass; every function in `threadsdelete/` and `main.py` is annotated.
-- [ ] Documented Meta endpoints only, at an explicit API version; no scraping or unofficial APIs. API facts come from `docs/RESEARCH.md` § Contracts, which wins over SPEC on API facts; SPEC wins on behavior.
+- [ ] Documented Meta endpoints at an explicit API version; no scraping or unofficial APIs.
 - [ ] Validate all configuration before any network activity. Booleans: case-insensitive `true`/`false` only; missing `DRY_RUN` → true.
 - [ ] One UTC run-start time; eligible iff `action_at <= run_started_at - timedelta(days=DAYS_AGO)`. Posts/replies use creation time; likes/reposts use the owner's action time.
 - [ ] Complete discovery and validation before any mutation; never mutate while paginating; dedupe by (operation, ID); sort by action time, category, ID.
@@ -31,7 +35,7 @@ Personal Threads cleanup tool (official Meta Threads API only) that removes the 
 | Help smoke | `uv run main.py --help` |
 | Budget measurements | `uv run python -c "from tests.test_budgets import report; report()"` |
 
-Live commands (`./scripts/run.sh`, `uv run --env-file .env main.py`) need the owner's credentials: never run them without the owner's say-so. A real `.env` with the owner's credentials is usually in the checkout, so anything that reaches Meta is live.
+Live commands (`./scripts/run.sh`, `uv run --env-file .env main.py`) require the owner's authorization. Treat the checkout's `.env` as real credentials; anything reaching Meta is live.
 
 ## Import boundaries
 
@@ -46,7 +50,7 @@ Live commands (`./scripts/run.sh`, `uv run --env-file .env main.py`) need the ow
 
 ## Constraints
 
-Checked by `kukulu_verify` during a flight (current rule definitions: `docs/flights/repost-removal/kukulu.json` `constraints`; the next flight's planner copies them into `docs/kukulu.json`, which `kukulu_verify` reads during a flight):
+Current rules: `constraints` in `docs/flights/repost-removal/kukulu.json`. The next flight's planner copies them to `docs/kukulu.json` for `kukulu_verify`:
 
 - `no-hardcoded-assumption-defaults`: the ⚠️ ASSUMPTION defaults (`MAX_DELETIONS_PER_RUN`, `HTTP_TIMEOUT_SECONDS`, `MAX_READ_RETRIES`, `MAX_RETRY_WAIT_SECONDS`) are literals only in `threadsdelete/config.py`.
 - `core-is-pure`: `threadsdelete/core.py` imports no os/sys/time/socket/httpx/pathlib/io/logging, calls no `open(`, `sleep(`, `datetime.now(`.
@@ -76,6 +80,6 @@ Checks by reading (no line pattern catches these):
 ## Conventions
 
 - **Tests:** use `tests.fakes.FakeThreadsApi` (an `httpx.MockTransport`), imported as `from tests.fakes import ...` so `tests/__init__.py`'s socket guard loads. Fixtures use fake IDs and usernames like `example_owner`.
-- **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and the matching `.env.sample` and README text; live measurements are still pending.
+- **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and matching README text; update `.env.sample` too when changing a user setting. Timeout and retry values are internal constants; live measurements are still pending.
 - **Pinned actions:** pin every `uses:` to a full 40-character commit SHA with the version in a trailing comment (`# v5.0.0`). Get it from `git ls-remote --tags https://github.com/<owner>/<repo>` (the peeled `^{}` SHA of the latest stable tag). Never guess a SHA.
 - **Kūkulu policies:** every flight sets `policies.archive` to `true` and `policies.finalize` to `"ready"` in `docs/kukulu.json`, unless that flight's spec says otherwise.

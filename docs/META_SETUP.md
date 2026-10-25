@@ -2,11 +2,11 @@
 
 Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23).
 
-Every command uses placeholders: never paste real IDs, secrets or tokens into this file, the README, an issue or a commit. Facts and sources are in [RESEARCH.md](RESEARCH.md); items it marks Unknown are called out below.
+Commands use placeholders. Never put real IDs, secrets or tokens in docs, issues or commits. Sources and unknowns: [RESEARCH.md](RESEARCH.md).
 
 ## Personal developer access versus serving other users
 
-This tool uses an app in development mode with **you** as the only Threads Tester. Testers can grant the app its permissions without Meta's App Review. Serving other people's accounts would require App Review and a published app; that is out of scope for this project. No API fee is documented for this use (RESEARCH, "Access, fees and eligibility").
+Use a development-mode app with yourself as its only Threads Tester; no App Review is needed. Serving other accounts requires App Review and publication and is out of scope. No API fee is documented; see [access findings](RESEARCH.md#access-fees-and-eligibility).
 
 ## 1. Developer registration
 
@@ -16,9 +16,9 @@ This tool uses an app in development mode with **you** as the only Threads Teste
 ## 2. Create the app and choose the Threads use case
 
 1. In the App Dashboard choose Create app and select the use case for accessing the Threads API.
-2. Open App settings, Basic. There are two sets of IDs and secrets; use the **Threads app ID** and **Threads app secret**, not the regular ones. Call them `<APP_ID>` and `<APP_SECRET>` below.
+2. Open App settings, Basic. Use the Threads app ID (`<APP_ID>`) and Threads app secret (`<APP_SECRET>`), not the regular app credentials.
 3. Under the Threads use case, open **Permissions and features** and enable `threads_basic`, `threads_read_replies` and `threads_delete`.
-4. Add a redirect callback URL in the Threads use case settings. Threads does not accept `localhost`. Use any HTTPS URL you control or a placeholder such as `https://example.com/callback/`; you only need to read the `code` parameter from the browser's address bar after approval, so the page itself does not have to load. The value must match exactly (Meta may add a trailing slash). Call it `<REDIRECT_URI>`.
+4. Add a redirect callback URL in the Threads use case settings. Use an HTTPS URL such as `https://example.com/callback/`, not `localhost`. Call it `<REDIRECT_URI>` and match it exactly, including any trailing slash Meta adds. The page need not load: copy `code` from the browser address bar after approval.
 
 ## 3. Testers (own-account role)
 
@@ -34,11 +34,11 @@ This tool uses an app in development mode with **you** as the only Threads Teste
 | `threads_read_replies` | Listing your own replies. |
 | `threads_delete` | Removing content and reading the deletion quota. |
 
-Meta's authorization-window documentation does not list `threads_delete` as a `scope` value, but the delete documentation requires it. Verified 2026-10-24: with `threads_delete` enabled under the use case's **Permissions and features** (step 2.3) and all three permissions requested in `scope` as shown below, the resulting token could delete.
+Despite its omission from the authorization-window docs, `threads_delete` is required. Verified 2026-10-24: enabling it in step 2.3 and requesting all three permissions in step 5a produced a token that could delete.
 
 ## 5. Token acquisition and exchange (manual)
 
-The app secret is used only during these manual steps. `threadsdelete` never stores or sends it; routine cleanup uses only the long-lived user token.
+Only manual token exchange uses the app secret; cleanup uses the long-lived user token.
 
 **a. Authorization code.** Open this URL in a browser while signed in as the tester account (one line):
 
@@ -102,4 +102,4 @@ Remove the app under Threads Account settings, Website permissions, or remove yo
 
 ## 10. What is not verified yet
 
-Steps 8 (renewal) and 9 (revocation) are from documentation only. Still to confirm by hand (see RESEARCH, "Untested and pending"): the error returned when the deletion quota is reached.
+The deletion-limit error is still unverified; see [pending checks](RESEARCH.md#untested-and-pending).
