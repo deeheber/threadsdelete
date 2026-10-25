@@ -6,7 +6,7 @@ Cleans up your own old [Threads](https://www.threads.com) content with Meta's of
 
 Feasibility findings and API contracts: [docs/RESEARCH.md](docs/RESEARCH.md). Meta app and token setup: [docs/META_SETUP.md](docs/META_SETUP.md).
 
-> Status: tested offline against synthetic fixtures. The Meta setup, the API reads and repost deletion were checked on the owner's account on 2026-10-24, but the tool itself has not run against a live account yet. Remaining live checks are in `docs/RESEARCH.md` under "Untested and pending".
+> Status: tested offline against synthetic fixtures, and run live on the owner's account on 2026-10-25 through GitHub Actions (a preview, then a removal of posts and replies). Remaining live checks are in `docs/RESEARCH.md` under "Untested and pending".
 
 ## Quick start
 
