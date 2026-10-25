@@ -228,7 +228,7 @@ The original research (2026-10-23) used no credentials. Live checks on the owner
 - `DELETE /{id}` on one old repost (of another person's post) returned `{"success": true, "deleted_id": "<id>"}`. A follow-up GET returned error 100, subcode 33. The owner confirmed in the app that the repost was gone and the original post remained.
 - `delete_quota_usage` was 15 before and after that deletion. `threads_publishing_limit` returned `delete_quota_usage` and `delete_config` (`quota_total` 100, `quota_duration` 86400) as documented.
 - GitHub Actions runs on 2026-10-25: a `workflow_dispatch` preview (90 days) listed 30 posts, 4 quotes and 55 replies with discovery complete. A removal run (`DAYS_AGO=365`, cap 5) removed 2 posts and 3 replies with no failed or unknown outcomes and deferred the rest. `delete_quota_usage` went from 10 to 15, and stayed at 15 after the later repost deletion.
-- The owner completed `docs/META_SETUP.md` steps 1 to 7. The resulting token could delete, so `threads_delete` was granted, and it worked through the `access_token` query parameter.
+- The owner completed `docs/META_SETUP.md` steps 1 to 7. The resulting token could delete, so `threads_delete` was granted (enabled under the Threads use case's "Permissions and features" in the App Dashboard), and it worked through the `access_token` query parameter.
 - `GET /me?fields=id,username` returned exactly `id` and `username`.
 - `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app back to 2023-07 (text posts and reposts). `GET /me/replies` returned 68 replies back to 2024-02, all with `is_reply_owned_by_me: true`.
 
