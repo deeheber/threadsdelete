@@ -53,3 +53,7 @@ These are `[live]` observations from the owner's account; record them in `docs/R
 - A preview against the fixtures lists eligible reposts as `would remove`, and the summary shows a `repost:` line.
 
 Manual check (owner, after merge): run a preview with real credentials, confirm old reposts are listed with the right dates, then run one real removal and check in Threads that the reposts are gone and the originals remain.
+
+## 7. Kūkulu settings
+
+In `docs/kukulu.json`, set `policies.archive` to `true` and `policies.finalize` to `"ready"`; keep the other policies at their defaults.
