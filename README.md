@@ -73,7 +73,7 @@ The report prints the account, the UTC cutoff, the mode, one line per candidate 
 
 ## What is covered
 
-From [docs/RESEARCH.md](docs/RESEARCH.md) (posts, replies and reposts are live-verified; quotes are not yet):
+From [docs/RESEARCH.md](docs/RESEARCH.md) (posts, quotes, replies and reposts are all live-verified):
 
 | Content | Status |
 | --- | --- |
