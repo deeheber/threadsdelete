@@ -84,15 +84,31 @@ def make_client(fake: FakeThreadsApi, **overrides: Any) -> ThreadsClient:
     return ThreadsClient(**settings)
 
 
-def fixture_api(quota: bool = True) -> FakeThreadsApi:
-    """Account example_owner with the synthetic fixtures: 5 eligible items at 90 days."""
+ELIGIBLE_REPOST: dict[str, object] = {
+    "id": "9000007",
+    "media_type": "REPOST_FACADE",
+    "timestamp": "2026-05-15T09:00:00+0000",
+    "permalink": "https://www.threads.com/@example_owner/post/AAA7",
+    "owner": {"id": "1000001"},
+    "reposted_post": None,
+}
+
+
+def fixture_api(quota: bool = True, eligible_repost: bool = False) -> FakeThreadsApi:
+    """Account example_owner with the synthetic fixtures.
+
+    5 eligible items at 90 days by default, 6 with eligible_repost=True (9000007 sorts last).
+    """
+    page2 = load_fixture("threads_page2.json")
+    if eligible_repost:
+        page2["data"].append(ELIGIBLE_REPOST)
     fake = FakeThreadsApi()
     fake.add("GET", "me", json_response(load_fixture("me.json")))
     fake.add(
         "GET",
         "me/threads",
         json_response(load_fixture("threads_page1.json")),
-        json_response(load_fixture("threads_page2.json")),
+        json_response(page2),
     )
     fake.add("GET", "me/replies", json_response(load_fixture("replies.json")))
     if quota:

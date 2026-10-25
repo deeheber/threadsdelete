@@ -18,9 +18,13 @@ Transport = httpx.BaseTransport
 REDACTED = "[REDACTED]"
 
 # Categories from docs/RESEARCH.md Contracts > Category: *. Media and carousel posts are POST.
-SUPPORTED_CATEGORIES: tuple[Category, ...] = (Category.POST, Category.QUOTE, Category.REPLY)
+SUPPORTED_CATEGORIES: tuple[Category, ...] = (
+    Category.POST,
+    Category.QUOTE,
+    Category.REPOST,
+    Category.REPLY,
+)
 UNSUPPORTED_CATEGORIES: Mapping[Category, str] = {
-    Category.REPOST: "no documented call removes a repost (docs/RESEARCH.md)",
     Category.LIKE: "no documented endpoint lists or removes the owner's likes (docs/RESEARCH.md)",
 }
 _THREADS_PATH = "me/threads"
@@ -300,8 +304,8 @@ class ThreadsClient:
     def discover(self, category: Category, identity: Identity) -> tuple[list[Candidate], int]:
         """Candidates of one supported category and the number of records scanned.
 
-        Scanned counts records classified into the category; records of an unsupported
-        category found on the same edge (reposts) are counted under POST and not returned.
+        Scanned counts records classified into the category. Reposts are their own category
+        and are removed by the repost record's own id.
         """
         if category not in SUPPORTED_CATEGORIES:
             raise ValueError(f"unsupported category: {category}")
@@ -319,10 +323,11 @@ class ThreadsClient:
             if not isinstance(media_type, str) or not media_type:
                 raise self._fail(ResponseError, "record lacks a media_type; cannot classify")
             if media_type == _REPOST_TYPE:
-                if wanted is Category.POST:
-                    scanned += 1  # unsupported category: scanned, never a candidate
-                continue
-            category = Category.QUOTE if record.get("is_quote_post") is True else Category.POST
+                category = Category.REPOST
+            elif record.get("is_quote_post") is True:
+                category = Category.QUOTE
+            else:
+                category = Category.POST
             if category is not wanted:
                 continue
             scanned += 1

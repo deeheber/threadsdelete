@@ -54,6 +54,16 @@ class CliPreviewTests(unittest.TestCase):
         self.assertIn("=== Summary ===", out)
         self.assertIn("would remove  post  9000001", out)
 
+    def test_preview_lists_eligible_repost(self) -> None:
+        fake = fixture_api(eligible_repost=True)
+        code, out, _ = run_main(fake)
+        self.assertEqual(code, 0)
+        self.assertIn("would remove  repost  9000007", out)
+        self.assertIn("repost: scanned=2 eligible=1 would_remove=1", out)
+        self.assertNotIn("Excluded: repost", out)
+        self.assertIn("Excluded: like", out)
+        self.assertEqual({r.method for r in fake.requests}, {"GET"})
+
     def test_missing_dry_run_defaults_to_preview(self) -> None:
         fake = fixture_api()
         code, out, _ = run_main(fake)

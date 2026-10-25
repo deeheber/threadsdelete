@@ -16,7 +16,6 @@ class Category(StrEnum):
 
 class Operation(StrEnum):
     DELETE = "delete"
-    UNREPOST = "unrepost"
     UNLIKE = "unlike"
 
 
@@ -24,7 +23,7 @@ OPERATION_FOR: Mapping[Category, Operation] = {
     Category.POST: Operation.DELETE,
     Category.REPLY: Operation.DELETE,
     Category.QUOTE: Operation.DELETE,
-    Category.REPOST: Operation.UNREPOST,
+    Category.REPOST: Operation.DELETE,
     Category.LIKE: Operation.UNLIKE,
 }
 

@@ -15,6 +15,7 @@ from threadsdelete.api import (
 from threadsdelete.core import Candidate, Category, Operation, parse_timestamp
 
 POST = Candidate(Category.POST, "9000001", parse_timestamp("2026-01-05T10:00:00+0000"), None)
+REPOST = Candidate(Category.REPOST, "9000005", parse_timestamp("2026-01-05T10:00:00+0000"), None)
 OWNER = Identity("1000001", "example_owner")
 
 
@@ -89,10 +90,40 @@ class RemoveTests(unittest.TestCase):
     def test_only_delete_operations_are_supported(self) -> None:
         fake = FakeThreadsApi()
         client = make_client(fake, read_only=False)
-        for category in (Category.REPOST, Category.LIKE):
+        for category in (Category.LIKE,):
             with self.assertRaises(ValueError):
                 client.remove(Candidate(category, "5", POST.action_at, None))
         self.assertEqual(fake.requests, [])
+
+    def test_repost_removed_by_own_record_id(self) -> None:
+        fake = FakeThreadsApi()
+        fake.add(
+            "DELETE", REPOST.target_id, json_response({"success": True, "deleted_id": "9000005"})
+        )
+        self.assertIsNone(make_client(fake, read_only=False).remove(REPOST))
+        self.assertEqual(len(fake.requests), 1)
+        self.assertEqual(fake.requests[0].method, "DELETE")
+        self.assertTrue(fake.requests[0].url.path.endswith("/9000005"))
+
+    def test_repost_removal_failures_classified_like_posts(self) -> None:
+        item = {
+            "error": {"message": "x", "type": "OAuthException", "code": 100, "error_subcode": 33}
+        }
+        cases: list[tuple[type[Exception], httpx.Response | Exception]] = [
+            (UnknownOutcomeError, json_response({"success": True, "deleted_id": "8000001"})),
+            (ItemError, json_response(item, 400)),
+            (UnknownOutcomeError, httpx.ReadTimeout("slow")),
+            (AuthError, json_response({}, 401)),
+            (QuotaExceededError, error_response(4, 400)),
+        ]
+        for kind, reply in cases:
+            fake = FakeThreadsApi()
+            fake.add("DELETE", REPOST.target_id, reply, repeat=True)
+            with self.assertRaises(kind) as raised:
+                make_client(fake, read_only=False).remove(REPOST)
+            self.assertIs(type(raised.exception), kind)
+            self.assertEqual(len(fake.requests), 1)
+            self.assertEqual(fake.sleeps, [])
 
 
 class QuotaTests(unittest.TestCase):

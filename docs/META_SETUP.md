@@ -102,4 +102,4 @@ Remove the app under Threads Account settings, Website permissions, or remove yo
 
 ## 10. What is not verified yet
 
-Steps 8 (renewal) and 9 (revocation) are from documentation only. Still to confirm by hand (see RESEARCH, "Untested and pending"): deletion of quote posts, and the error returned when the deletion quota is reached.
+Steps 8 (renewal) and 9 (revocation) are from documentation only. Still to confirm by hand (see RESEARCH, "Untested and pending"): the error returned when the deletion quota is reached.

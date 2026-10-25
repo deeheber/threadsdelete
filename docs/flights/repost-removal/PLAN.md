@@ -157,3 +157,15 @@ The Likes row stays "Excluded". Use no real IDs or tokens. Keep every other sect
 - SPEC section 4, Counting does not fix the order of the summary lines. Resolution: they follow `SUPPORTED_CATEGORIES` order: post, quote, repost, reply.
 - SPEC section 6 "CI is green" cannot be observed by the implementer. Resolution: the reviewer checks the pull request's CI; P1-04 lists it as a manual check.
 - Since the first flight, `main` gained `group: ci-${{ github.ref }}` in `.github/workflows/ci.yml`, which the first flight's `no-expression-in-run` rule (and its description, "do not put expressions in ... concurrency group: values") flags. Resolution: the rule is relaxed to allow any non-`run` key mapping (see Decisions). The line interpolates into a concurrency key, not shell code, so the rule's intent still holds.
+
+## Review fixes (round 1)
+
+### R1-01: Test that REPOST_FACADE wins over the quote flag in classification
+
+**Goal:** Cover SPEC section 4 Discovery (REPOST_FACADE records are Category.REPOST candidates) and the PLAN decision 'Classification precedence': a REPOST_FACADE record is classified as a repost before is_quote_post is looked at. Today, swapping the if/elif branches in threadsdelete/api.py _discover_threads (line ~325) survives the whole offline suite.
+**Files touched:** tests/test_discovery.py
+**Design constraints:** Test-only change; threadsdelete/api.py is correct and must not change. Follow CLAUDE.md Conventions → Tests: import from tests.fakes, synthetic IDs (owner 1000001 / example_owner). Constraint no-unrepost-operation scans tests/, so never write the UNREPOST name or the 'unrepost' string literal. No 'reposted_post' needed in the record.
+**Acceptance tests:** New tests/test_discovery.py::ThreadsEdgeTests::test_repost_facade_wins_over_quote_flag: using threads_fake with one record {"id": "5", "media_type": "REPOST_FACADE", "is_quote_post": True, "timestamp": "2026-01-01T00:00:00+0000", "owner": {"id": "1000001"}}, discover(Category.REPOST, OWNER) returns exactly one candidate with category is Category.REPOST and target_id "5" and scanned == 1; discover(Category.QUOTE, OWNER) on the same client returns ([], 0). Both assertions are required: the QUOTE one is what fails when the branches are swapped.
+**Out of scope:** threadsdelete/api.py and every other source file; fixtures and tests/fakes.py; README; any other test file.
+**Verification:** Full verify set (kukulu_verify). Then the reviewer's mutant must be killed: kukulu_mutate on threadsdelete/api.py swapping the `if media_type == _REPOST_TYPE:\n                category = Category.REPOST\n            elif record.get("is_quote_post") is True:\n                category = Category.QUOTE` block so the is_quote_post check comes first, with targeted: unit, filter: tests.test_discovery → killed: true.
+**Depends on:** none

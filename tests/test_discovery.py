@@ -34,6 +34,17 @@ def post(**overrides: Any) -> dict[str, Any]:
     return record
 
 
+def repost(**overrides: Any) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "id": "5",
+        "media_type": "REPOST_FACADE",
+        "timestamp": "2026-01-01T00:00:00+0000",
+        "owner": {"id": "1000001"},
+    }
+    record.update(overrides)
+    return record
+
+
 class ThreadsEdgeTests(unittest.TestCase):
     def fixture_client(self) -> tuple[FakeThreadsApi, ThreadsClient]:
         fake = FakeThreadsApi()
@@ -49,17 +60,25 @@ class ThreadsEdgeTests(unittest.TestCase):
         fake, client = self.fixture_client()
         posts, post_scanned = client.discover(Category.POST, OWNER)
         quotes, quote_scanned = client.discover(Category.QUOTE, OWNER)
+        reposts, repost_scanned = client.discover(Category.REPOST, OWNER)
         self.assertEqual([c.target_id for c in posts], ["9000001", "9000002", "9000003", "9000006"])
         self.assertTrue(all(c.category is Category.POST for c in posts))
         self.assertEqual([c.target_id for c in quotes], ["9000004"])
         self.assertEqual(quotes[0].category, Category.QUOTE)
-        # 4 posts plus the repost facade (unsupported, scanned but never returned)
-        self.assertEqual((post_scanned, quote_scanned), (5, 1))
-        everything = {c.target_id for c in posts + quotes}
-        self.assertNotIn("9000005", everything)  # repost
+        self.assertEqual([c.target_id for c in reposts], ["9000005"])
+        self.assertEqual(reposts[0].category, Category.REPOST)
+        self.assertEqual((post_scanned, quote_scanned, repost_scanned), (4, 1, 1))
+        everything = {c.target_id for c in posts + quotes + reposts}
         self.assertNotIn("9000031", everything)  # carousel child
         self.assertEqual(len(fake.calls("GET", "me/threads")), 2)  # two pages, fetched once
         self.assertEqual(posts[0].permalink, "https://www.threads.com/@example_owner/post/AAA1")
+
+    def test_repost_facade_wins_over_quote_flag(self) -> None:
+        _, client = threads_fake(post(id="5", media_type="REPOST_FACADE", is_quote_post=True))
+        reposts, scanned = client.discover(Category.REPOST, OWNER)
+        self.assertEqual([(c.category, c.target_id) for c in reposts], [(Category.REPOST, "5")])
+        self.assertEqual(scanned, 1)
+        self.assertEqual(client.discover(Category.QUOTE, OWNER), ([], 0))
 
     def test_creation_time_is_the_action_time(self) -> None:
         _, client = self.fixture_client()
@@ -88,10 +107,38 @@ class ThreadsEdgeTests(unittest.TestCase):
             with self.assertRaises(TimestampError, msg=str(stamp)):
                 client.discover(Category.POST, OWNER)
 
-    def test_repost_records_need_no_ownership_and_are_not_returned(self) -> None:
-        repost = {"id": "5", "media_type": "REPOST_FACADE", "timestamp": "2026-01-01T00:00:00+0000"}
-        _, client = threads_fake(repost)
-        self.assertEqual(client.discover(Category.POST, OWNER), ([], 1))
+    def test_repost_uses_repost_timestamp_and_own_id(self) -> None:
+        record = repost(reposted_post={"id": "8000001"})
+        _, client = threads_fake(record)
+        found, scanned = client.discover(Category.REPOST, OWNER)
+        self.assertEqual(scanned, 1)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].target_id, "5")
+        self.assertIs(found[0].category, Category.REPOST)
+        self.assertEqual(found[0].action_at, datetime(2026, 1, 1, tzinfo=UTC))
+        self.assertIsNone(found[0].permalink)
+
+    def test_repost_foreign_or_missing_owner_aborts(self) -> None:
+        for owner in (
+            {"owner": {"id": "42"}},
+            {"owner": None},
+            {"owner": {}},
+            {"owner": "1000001"},
+        ):
+            _, client = threads_fake(repost(**owner))
+            with self.assertRaises(OwnershipError, msg=str(owner)):
+                client.discover(Category.REPOST, OWNER)
+        record = repost()
+        del record["owner"]
+        _, client = threads_fake(record)
+        with self.assertRaises(OwnershipError):
+            client.discover(Category.REPOST, OWNER)
+
+    def test_malformed_repost_timestamp_aborts(self) -> None:
+        for stamp in ("2026-01-01T00:00:00", "yesterday", None):
+            _, client = threads_fake(repost(timestamp=stamp))
+            with self.assertRaises(TimestampError, msg=str(stamp)):
+                client.discover(Category.REPOST, OWNER)
 
     def test_unclassifiable_record_aborts(self) -> None:
         record = post()
@@ -105,11 +152,13 @@ class ThreadsEdgeTests(unittest.TestCase):
         fake, client = self.fixture_client()
         fake.add("GET", "me/replies", json_response(load_fixture("replies.json")))
         client.discover(Category.POST, OWNER)
+        client.discover(Category.REPOST, OWNER)
         client.discover(Category.REPLY, OWNER)
         self.assertGreaterEqual(len(fake.requests), 3)
         for request in fake.requests:
             fields = request.url.params["fields"].split(",")
             self.assertNotIn("text", fields)
+            self.assertNotIn("reposted_post", fields)
             self.assertIn("timestamp", fields)
 
 
@@ -143,6 +192,8 @@ class CategoryCoverageTests(unittest.TestCase):
         self.assertEqual(
             sorted(SUPPORTED_CATEGORIES + tuple(UNSUPPORTED_CATEGORIES)), sorted(Category)
         )
+        self.assertEqual(set(UNSUPPORTED_CATEGORIES), {Category.LIKE})
+        self.assertIn(Category.REPOST, SUPPORTED_CATEGORIES)
         fake = FakeThreadsApi()
         client = make_client(fake)
         for category, reason in UNSUPPORTED_CATEGORIES.items():
