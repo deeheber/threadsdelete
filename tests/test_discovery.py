@@ -73,6 +73,13 @@ class ThreadsEdgeTests(unittest.TestCase):
         self.assertEqual(len(fake.calls("GET", "me/threads")), 2)  # two pages, fetched once
         self.assertEqual(posts[0].permalink, "https://www.threads.com/@example_owner/post/AAA1")
 
+    def test_repost_facade_wins_over_quote_flag(self) -> None:
+        _, client = threads_fake(post(id="5", media_type="REPOST_FACADE", is_quote_post=True))
+        reposts, scanned = client.discover(Category.REPOST, OWNER)
+        self.assertEqual([(c.category, c.target_id) for c in reposts], [(Category.REPOST, "5")])
+        self.assertEqual(scanned, 1)
+        self.assertEqual(client.discover(Category.QUOTE, OWNER), ([], 0))
+
     def test_creation_time_is_the_action_time(self) -> None:
         _, client = self.fixture_client()
         posts, _ = client.discover(Category.POST, OWNER)
