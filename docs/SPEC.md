@@ -12,7 +12,7 @@ Keep every rule in `CLAUDE.md`. No live account actions during the build.
 
 ## 2. Live findings (2026-10-24)
 
-These are `[live]` observations from the owner's account; record them in `docs/RESEARCH.md`.
+These are `[live]` observations from the owner's account, already recorded in `docs/RESEARCH.md` ("Category: reposts" and "Live observations").
 
 - `GET /me/threads` returns reposts as records with `media_type=REPOST_FACADE`.
 - `timestamp` on a `REPOST_FACADE` record is the time of the repost (the owner's action time), not the original post's time.
@@ -39,7 +39,6 @@ These are `[live]` observations from the owner's account; record them in `docs/R
 
 - `threadsdelete/api.py`: supported/unsupported categories, `_discover_threads`, `remove`.
 - `threadsdelete/core.py`: `OPERATION_FOR` mapping for reposts.
-- `docs/RESEARCH.md`: change "Category: reposts" to `Supported: yes` with the section 2 findings labeled `[live]` and dated, and update the summary and coverage table.
 - `README.md`: "What is covered" table and any text saying reposts are excluded.
 - Tests and fixtures:
   - in `tests/fixtures/threads_page2.json`, give repost `9000005` an `owner` and set `reposted_post` to `null` to match the live data. It is newer than the 90-day cutoff, so it stays ineligible in existing tests; add an eligible repost where a test needs one;
