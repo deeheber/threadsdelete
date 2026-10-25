@@ -1,55 +1,22 @@
 {
-  "round": 1,
-  "implemented": true,
-  "reviewed": true,
-  "verdict": "APPROVED",
-  "summarized": true,
+  "round": 0,
+  "implemented": false,
+  "reviewed": false,
+  "verdict": null,
+  "summarized": false,
   "halted": null,
   "preexistingUntracked": [],
   "policies": {
     "signing": "auto",
     "push": true,
     "pr": "draft",
-    "feedback": true,
-    "archive": true,
-    "finalize": "ready",
-    "mergeMethod": "merge",
-    "syncBase": true
+    "feedback": true
   },
-  "signing": "on",
-  "rounds": [
-    {
-      "round": 1,
-      "fixTasks": 1,
-      "unblocked": 0,
-      "verdict": "CHANGES REQUESTED",
-      "nonConverging": false,
-      "sources": {
-        "review": 1,
-        "mutation": 0,
-        "blocked": 0
-      },
-      "at": "2026-10-25T14:23:43.696Z"
-    },
-    {
-      "round": 2,
-      "fixTasks": 0,
-      "unblocked": 0,
-      "verdict": "APPROVED",
-      "sources": {
-        "review": 0,
-        "mutation": 0,
-        "blocked": 0
-      },
-      "at": "2026-10-25T14:27:35.502Z"
-    }
-  ],
+  "signing": null,
+  "rounds": [],
   "archived": {
-    "slug": "threadsdelete",
-    "dir": "docs/flights/threadsdelete",
-    "at": "2026-10-24T03:55:44.685Z"
-  },
-  "cleanroom": {
-    "mode": "general"
+    "slug": "repost-removal",
+    "dir": "docs/flights/repost-removal",
+    "at": "2026-10-25T14:30:12.612Z"
   }
 }
