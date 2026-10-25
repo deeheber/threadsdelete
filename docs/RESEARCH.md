@@ -2,7 +2,7 @@
 
 ## Summary
 
-Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported: posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. `DELETE /{id}` is documented for posts and live-verified for posts and replies; for quotes it is inferred and not yet tested. Reposts: removal is undocumented, but a live check on 2026-10-24 showed `DELETE /{id}` removes them. Unsupported: likes (no documented list, timestamp or unlike endpoint; newer endpoints unknown). See Live observations for what has been verified and Untested and pending for what has not, notably quote deletion and the error code of the deletion limit.
+Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported: posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. `DELETE /{id}` is documented for posts and live-verified for posts, quotes and replies. Reposts: removal is undocumented, but a live check on 2026-10-24 showed `DELETE /{id}` removes them. Unsupported: likes (no documented list, timestamp or unlike endpoint; newer endpoints unknown). See Live observations for what has been verified and Untested and pending for what has not, notably the error code of the deletion limit.
 
 ## Sources
 
@@ -64,7 +64,7 @@ Retrieved 2026-10-23 with `curl` (no credentials, no token). "OK" means HTTP 200
 | --- | --- | --- |
 | posts (text, GIF, poll) | yes | `GET /me/threads`, `timestamp`, `DELETE /{id}` |
 | media and carousel posts | yes | same endpoint; parent post only |
-| quotes | yes | `is_quote_post` on `/me/threads`; `DELETE /{id}` |
+| quotes | yes | `is_quote_post` on `/me/threads`; `DELETE /{id}` (live-verified) |
 | replies | yes | `GET /me/replies`, `is_reply_owned_by_me`; `DELETE /{id}` (live-verified 2026-10-25) |
 | reposts | yes | `REPOST_FACADE` on `/me/threads`; `DELETE /{id}` (live-verified 2026-10-24) |
 | likes | no | no documented list, timestamp or unlike endpoint |
@@ -151,7 +151,7 @@ Fields: `id,timestamp,permalink,owner,media_type,is_quote_post` (the same reques
 Action timestamp field: `timestamp` (creation time; owner's own).
 Ownership check: `owner.id` must equal the identity `id` (as for posts).
 Classification: Record from `/me/threads` with `is_quote_post` true and `media_type` not `REPOST_FACADE`.
-Remove: `DELETE /{threads-media-id}`; success body `{"success": true, "deleted_id": "<id>"}`. [doc, inferred] a quote post is created by the owner through the normal publishing flow (`quote_post_id` on the container), so it is the owner's post.
+Remove: `DELETE /{threads-media-id}`; success body `{"success": true, "deleted_id": "<id>"}`. [doc, inferred] a quote post is created by the owner through the normal publishing flow (`quote_post_id` on the container), so it is the owner's post. [live] Verified: `DELETE` on an owned quote returned the success body and a follow-up GET returned error 100, subcode 33.
 Permission: `threads_basic`, `threads_delete`.
 Quota: Shared deletion quota: 100 deletes per rolling 24 hours per profile (see Quota inspection).
 Historical coverage: [doc] Not stated beyond the `since` lower bound `1688540400` (2023-07-05, Threads launch), so everything since launch is nominally reachable. Whether content created in the Threads app (not through the API) is returned is Unknown (pending live check); the documentation describes the endpoint as returning "all threads created by a user".
@@ -183,7 +183,7 @@ Ownership check: [live] `owner.id` equals the authenticated identity `id`; a mis
 Classification: `media_type == "REPOST_FACADE"`. [live] `reposted_post` is `null`, so the original post's ID is unavailable; remove by the repost record's own `id` only.
 Remove: [live] `DELETE /{repost-record-id}` returns `{"success": true, "deleted_id": "<id>"}`; the record then no longer exists (error 100, subcode 33) and the original post is untouched.
 Permission: `threads_basic`, `threads_delete`.
-Quota: Unknown. [live] One repost deletion left `delete_quota_usage` unchanged.
+Quota: [live] Shared deletion quota, as for posts: a run that removed several reposts raised `delete_quota_usage` by exactly that number. (An earlier single deletion seemed to leave it unchanged, most likely a delayed update.)
 Historical coverage: [live] reposts several years old were returned.
 Evidence: https://developers.facebook.com/documentation/threads/posts/reposts ; https://developers.facebook.com/documentation/threads/posts/delete-posts (2026-10-23)
 
@@ -228,15 +228,14 @@ The original research (2026-10-23) used no credentials. Live checks on the owner
 - `DELETE /{id}` on one old repost (of another person's post) returned `{"success": true, "deleted_id": "<id>"}`. A follow-up GET returned error 100, subcode 33. The owner confirmed in the app that the repost was gone and the original post remained.
 - `delete_quota_usage` did not change after that deletion. `threads_publishing_limit` returned `delete_quota_usage` and `delete_config` (`quota_total` 100, `quota_duration` 86400) as documented.
 - GitHub Actions runs on 2026-10-25: a `workflow_dispatch` preview listed posts, quotes and replies with discovery complete. A removal run with a small cap removed posts and replies with no failed or unknown outcomes and deferred the rest. `delete_quota_usage` rose by exactly the number of posts and replies removed, and did not change after the later repost deletion.
-- A removal run deleted reposts with no failed or unknown outcomes. A follow-up GET on each removed repost returned error 100, subcode 33, while a repost deferred by the cap still returned 200.
+- A removal run deleted reposts with no failed or unknown outcomes. A follow-up GET on each removed repost returned error 100, subcode 33, while a repost deferred by the cap still returned 200. `delete_quota_usage` rose by exactly the number of reposts removed.
+- A single `DELETE` on an owned quote post returned `{"success": true}` with the matching `deleted_id`; a follow-up GET returned error 100, subcode 33. `delete_quota_usage` rose by 1, but only after a delay of about a minute, so a quota read right after a deletion can lag.
 - The owner completed `docs/META_SETUP.md` steps 1 to 7. The resulting token could delete, so `threads_delete` was granted (enabled under the Threads use case's "Permissions and features" in the App Dashboard), and it worked through the `access_token` query parameter.
 - `GET /me?fields=id,username` returned exactly `id` and `username`.
 - `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app, including text posts and reposts several years old. `GET /me/replies` returned replies created in the app, all with `is_reply_owned_by_me: true`.
 
 ## Untested and pending
 
-- Whether `DELETE /{id}` removes a quote post.
-- Whether repost deletions count against the 100-per-24-hours deletion quota (one deletion left `delete_quota_usage` unchanged; re-check for a delayed update).
 - Which error code and HTTP status the 100-per-day deletion limit raises.
 - Ghost posts: whether `/me/threads` returns them (they have a separate `ghost_posts` edge not used here).
 - Any Meta platform-terms constraint on automated personal cleanup.
