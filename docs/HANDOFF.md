@@ -23,3 +23,9 @@ Owner, after merge: run a preview with real credentials, confirm old reposts are
 ## Codebase notes
 - `kukulu_task_done` requires HEAD's subject to be `<ID>:`; for a log-only task make an empty commit with that subject.
 - Constraint `no-unrepost-operation` also scans tests; avoid the literal there.
+
+## Round 1
+
+- Branch build/2026-10-25, head b632199. Tasks: 5 done, 0 blocked, 0 skipped.
+- R1-01: added test_repost_facade_wins_over_quote_flag in tests/test_discovery.py. Test-only; api.py unchanged. Swapping the if/elif in api.py makes it fail (checked by hand, since kukulu_mutate was not available).
+- Interpretation choices: none. ASSUMPTION defaults untouched. Manual check: none.
