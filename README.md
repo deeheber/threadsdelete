@@ -73,14 +73,14 @@ The report prints the account, the UTC cutoff, the mode, one line per candidate 
 
 ## What is covered
 
-From [docs/RESEARCH.md](docs/RESEARCH.md) (documentation findings, not yet live-verified):
+From [docs/RESEARCH.md](docs/RESEARCH.md) (posts and replies are live-verified; quotes are not yet):
 
 | Content | Status |
 | --- | --- |
 | Posts, including image/video/audio, polls and carousels (the parent post only) | Removed |
 | Quote posts | Removed |
 | Your own replies | Removed |
-| Reposts | Excluded: no documented call removes a repost |
+| Reposts | Excluded for now: removal works in a live test, implementation planned (#4) |
 | Likes | Excluded: the API has no documented endpoint to list or remove likes |
 
 Nothing from other people is ever touched: every record must prove it is yours (post `owner` equals your user ID; replies must be flagged as yours and carry your username). If ownership or any timestamp is ambiguous, discovery is marked incomplete and nothing is removed.
