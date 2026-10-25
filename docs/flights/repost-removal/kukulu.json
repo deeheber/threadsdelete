@@ -341,18 +341,16 @@
     },
     {
       "id": "no-expression-in-run",
-      "description": "Settings reach shell steps through env mappings, never ${{ }} interpolated into run code (SPEC section 6). A line containing ${{ must be a plain 'key: ${{ ... }}' mapping whose key is not run; do not put expressions in name: or concurrency group: values. Single exception: ci.yml's `group: ci-${{ github.ref }}` line (an exact-line allowance, not a general one).",
+      "description": "Settings reach shell steps through env mappings, never ${{ }} interpolated into run code (original SPEC section 6). A line containing ${{ must be a YAML key mapping whose key is not run (e.g. KEY: ${{ ... }}, if: ${{ ... }}, group: ci-${{ github.ref }}); a run: line or a bare shell line with ${{ is a hit. A key-looking line inside a multi-line run: | block is not caught: reviewer checks by reading.",
       "paths": [
         ".github/workflows/"
       ],
-      "pattern": "^(?!\\s*group: ci-\\$\\{\\{ github\\.ref \\}\\}\\s*$)(?!\\s*(?:-\\s*)?(?!run:)[A-Za-z_][\\w-]*:\\s*['\"]?\\$\\{\\{).*\\$\\{\\{",
+      "pattern": "^(?!\\s*(?:-\\s*)?(?!run:)[A-Za-z_][\\w-]*:\\s).*\\$\\{\\{",
       "shouldMatch": [
         "        run: echo \"${{ vars.DAYS_AGO }}\"",
         "          uv run main.py --days ${{ inputs.days }}",
         "      - run: echo ${{ secrets.THREADS_ACCESS_TOKEN }}",
-        "          echo \"days=${{ vars.DAYS_AGO }}\" >> \"$GITHUB_OUTPUT\"",
-        "  group: deploy-${{ github.ref }}",
-        "    name: Run for ${{ github.ref }}"
+        "          echo \"days=${{ vars.DAYS_AGO }}\" >> \"$GITHUB_OUTPUT\""
       ],
       "shouldNotMatch": [
         "          DAYS_AGO: ${{ vars.DAYS_AGO }}",

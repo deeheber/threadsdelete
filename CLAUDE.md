@@ -46,7 +46,7 @@ Live commands (`./scripts/run.sh`, `uv run --env-file .env main.py`) need the ow
 
 ## Constraints
 
-Checked by `kukulu_verify` during a flight (current rule definitions: `docs/flights/repost-removal/kukulu.json` `constraints`):
+Checked by `kukulu_verify` during a flight (current rule definitions: `docs/flights/repost-removal/kukulu.json` `constraints`; the next flight's planner copies them into `docs/kukulu.json`, which `kukulu_verify` reads during a flight):
 
 - `no-hardcoded-assumption-defaults`: the ⚠️ ASSUMPTION defaults (`MAX_DELETIONS_PER_RUN`, `HTTP_TIMEOUT_SECONDS`, `MAX_READ_RETRIES`, `MAX_RETRY_WAIT_SECONDS`) are literals only in `threadsdelete/config.py`.
 - `core-is-pure`: `threadsdelete/core.py` imports no os/sys/time/socket/httpx/pathlib/io/logging, calls no `open(`, `sleep(`, `datetime.now(`.
@@ -69,7 +69,7 @@ Checks by reading (no line pattern catches these):
 - All discovery for all supported categories finishes before the first `remove` call.
 - `remove` is called at most once per candidate per run; no retry wrapper around it.
 - `scripts/run.sh` contains no cleanup logic; exit status is preserved (`exec`, `pipefail`).
-- No `${{ }}` expression inside a multi-line `run: |` block (the `no-expression-in-run` pattern cannot see block context; its one exception is `ci.yml`'s exact `group: ci-${{ github.ref }}` line).
+- No `${{ }}` expression inside a multi-line `run: |` block (the `no-expression-in-run` pattern flags `run:` lines and bare shell lines, allows any other `key: ...${{ }}` mapping such as `group: ci-${{ github.ref }}`, and cannot see block context).
 - Test fixtures are synthetic; `.env`, tokens and real account data are never committed.
 - If any Bluesky source is adapted, its MIT notice is retained.
 
