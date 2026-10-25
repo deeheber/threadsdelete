@@ -9,6 +9,7 @@ Started: 2026-10-25T14:17:13.392Z
 - [x] P1-02 Discover reposts as removable candidates
 - [x] P1-03 README coverage for reposts
 - [x] P1-04 Phase 1 close — push and manual checks
+- [ ] R1-01 Test that REPOST_FACADE wins over the quote flag in classification
 
 ## Log
 
