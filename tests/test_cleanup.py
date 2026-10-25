@@ -346,6 +346,24 @@ class SplitByBudgetTests(unittest.TestCase):
         allowed, deferred = split_by_budget(items, 3, {Operation.DELETE: 0})
         self.assertEqual((len(allowed), len(deferred)), (0, 5))
 
+    def test_reposts_share_delete_quota_and_cap(self) -> None:
+        base = RUN_START - timedelta(days=200)
+        items = [
+            Candidate(
+                Category.POST if i % 2 == 0 else Category.REPOST,
+                str(i),
+                base + timedelta(days=i),
+                None,
+            )
+            for i in range(8)
+        ]
+        allowed, deferred = split_by_budget(items, 10, {Operation.DELETE: 3})
+        self.assertEqual([c.target_id for c in allowed], ["0", "1", "2"])
+        self.assertEqual(len(deferred), 5)
+        allowed, deferred = split_by_budget(items, 4, {})
+        self.assertEqual([c.target_id for c in allowed], ["0", "1", "2", "3"])
+        self.assertEqual(len(deferred), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

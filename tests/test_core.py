@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from threadsdelete.core import (
     Candidate,
     Category,
+    Operation,
     SelectionError,
     TimestampError,
     compute_cutoff,
@@ -61,6 +62,20 @@ class TimestampTests(unittest.TestCase):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_reposts_use_the_delete_operation(self) -> None:
+        self.assertIs(cand(Category.REPOST, "5", RUN_START).operation, Operation.DELETE)
+        self.assertEqual({o.value for o in Operation}, {"delete", "unlike"})
+        cutoff = compute_cutoff(RUN_START, 10)
+        base = RUN_START - timedelta(days=30)
+        with self.assertRaises(SelectionError):
+            select_eligible(
+                [
+                    cand(Category.REPOST, "5", base),
+                    cand(Category.POST, "5", base - timedelta(days=1)),
+                ],
+                cutoff,
+            )
+
     def test_duplicates_collapse_and_order_is_deterministic(self) -> None:
         cutoff = compute_cutoff(RUN_START, 10)
         base = RUN_START - timedelta(days=30)
