@@ -18,5 +18,6 @@
     "slug": "repost-removal",
     "dir": "docs/flights/repost-removal",
     "at": "2026-10-25T14:30:12.612Z"
-  }
+  },
+  "breaking": true
 }
