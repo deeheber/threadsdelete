@@ -1,6 +1,6 @@
 # Meta setup and token maintenance
 
-Verified against Meta documentation on 2026-10-23; live steps pending owner verification.
+Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23).
 
 Every command uses placeholders: never paste real IDs, secrets or tokens into this file, the README, an issue or a commit. Facts and sources are in [RESEARCH.md](RESEARCH.md); items it marks Unknown are called out below.
 
@@ -102,4 +102,4 @@ Remove the app under Threads Account settings, Website permissions, or remove yo
 
 ## 10. What is not verified yet
 
-All steps above come from documentation, not from a live account. Still to confirm by hand (see RESEARCH, "Untested and pending"): the `threads_delete` scope request, `GET /me`, which content created in the Threads app is returned, deletion of replies and quote posts, and the exact error returned when the deletion quota is reached.
+Steps 8 (renewal) and 9 (revocation) are from documentation only. Still to confirm by hand (see RESEARCH, "Untested and pending"): deletion of replies and quote posts, and the error returned when the deletion quota is reached.
