@@ -10,13 +10,20 @@
     "signing": "auto",
     "push": true,
     "pr": "draft",
-    "feedback": true
+    "feedback": true,
+    "archive": true,
+    "finalize": "ready",
+    "mergeMethod": "merge",
+    "syncBase": true
   },
-  "signing": null,
+  "signing": "on",
   "rounds": [],
   "archived": {
     "slug": "threadsdelete",
     "dir": "docs/flights/threadsdelete",
     "at": "2026-10-24T03:55:44.685Z"
+  },
+  "cleanroom": {
+    "mode": "general"
   }
 }
