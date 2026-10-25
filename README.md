@@ -60,7 +60,7 @@ DRY_RUN=false ./scripts/run.sh
 
 Any key can be overridden inline, e.g. `DRY_RUN=false DAYS_AGO=30 ./scripts/run.sh`. `scripts/run.sh` only picks `.env` when it exists and keeps the exit status.
 
-The report prints the account, the UTC cutoff, the mode, one line per candidate (ID and permalink; post text is never fetched), then a block starting with `=== Summary ===` with per-category counts: scanned, eligible, would_remove, removed, failed, unknown_outcome, deferred.
+The report prints the account, the UTC cutoff, the mode, one line per candidate (ID and permalink; post text is never fetched), then a block starting with `=== Summary ===` with per-category counts (`post`, `quote`, `repost`, `reply`): scanned, eligible, would_remove, removed, failed, unknown_outcome, deferred.
 
 ### Exit statuses
 
@@ -73,25 +73,25 @@ The report prints the account, the UTC cutoff, the mode, one line per candidate 
 
 ## What is covered
 
-From [docs/RESEARCH.md](docs/RESEARCH.md) (posts and replies are live-verified; quotes are not yet):
+From [docs/RESEARCH.md](docs/RESEARCH.md) (posts, replies and reposts are live-verified; quotes are not yet):
 
 | Content | Status |
 | --- | --- |
 | Posts, including image/video/audio, polls and carousels (the parent post only) | Removed |
 | Quote posts | Removed |
 | Your own replies | Removed |
-| Reposts | Excluded for now: removal works in a live test, implementation planned (#4) |
+| Reposts | Removed (your repost only; the original post is untouched) |
 | Likes | Excluded: the API has no documented endpoint to list or remove likes |
 
-Nothing from other people is ever touched: every record must prove it is yours (post `owner` equals your user ID; replies must be flagged as yours and carry your username). If ownership or any timestamp is ambiguous, discovery is marked incomplete and nothing is removed.
+Nothing from other people is ever touched: every record must prove it is yours (post and repost `owner` equals your user ID; replies must be flagged as yours and carry your username). If ownership or any timestamp is ambiguous, discovery is marked incomplete and nothing is removed.
 
 ## Cutoff
 
-One UTC run-start time is captured per run. An item is eligible when `its time <= run start - DAYS_AGO days`. Posts, quotes and replies use their creation time. With `DAYS_AGO=90` and a run at `2026-10-23T05:00:00Z`, everything created at or before `2026-07-25T05:00:00Z` is eligible.
+One UTC run-start time is captured per run. An item is eligible when `its time <= run start - DAYS_AGO days`. Posts, quotes and replies use their creation time; reposts use the time you reposted, not the original post's age. With `DAYS_AGO=90` and a run at `2026-10-23T05:00:00Z`, everything created at or before `2026-07-25T05:00:00Z` is eligible.
 
 ## Quota and backlog
 
-Threads limits a profile to 100 deletions per rolling 24 hours. Before removing, the tool reads your remaining deletion quota and removes oldest first, up to the lower of `MAX_DELETIONS_PER_RUN` and the remaining quota. The rest is reported as `deferred` and picked up by a later run: at the default cap, a backlog of 500 takes 5 weekly runs. If the quota cannot be read, the report says `Quota: unavailable` and the run stays within the cap and stops at the API's own quota error. The cap is not a rolling-quota tracker; runs close together can still hit the API limit.
+Threads limits a profile to 100 deletions per rolling 24 hours. Before removing, the tool reads your remaining deletion quota and removes oldest first, up to the lower of `MAX_DELETIONS_PER_RUN` and the remaining quota. The rest is reported as `deferred` and picked up by a later run: at the default cap, a backlog of 500 takes 5 weekly runs. If the quota cannot be read, the report says `Quota: unavailable` and the run stays within the cap and stops at the API's own quota error. Repost removals count against `MAX_DELETIONS_PER_RUN` and are budgeted against the same deletion quota; whether Meta counts them toward the 100-per-24-hours limit is not confirmed (one live repost deletion left the usage unchanged). The cap is not a rolling-quota tracker; runs close together can still hit the API limit.
 
 Removals run one at a time and are never retried. If one ends with an unknown outcome (timeout, connection loss, server error), the run stops, reports it, and exits 1; the next run rediscovers what is left.
 
