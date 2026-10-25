@@ -26,14 +26,9 @@ def _env_help() -> str:
     defaults = [
         ("DRY_RUN", str(config.DEFAULT_DRY_RUN).lower()),
         ("DAYS_AGO", str(config.DEFAULT_DAYS_AGO)),
-        ("LOG_LEVEL", config.DEFAULT_LOG_LEVEL),
         ("THREADS_ACCESS_TOKEN", "required"),
         ("THREADS_USER_ID", "required"),
-        ("THREADS_API_VERSION", config.DEFAULT_API_VERSION),
         ("MAX_DELETIONS_PER_RUN", str(config.DEFAULT_MAX_DELETIONS_PER_RUN)),
-        ("HTTP_TIMEOUT_SECONDS", f"{config.DEFAULT_HTTP_TIMEOUT_SECONDS:g}"),
-        ("MAX_READ_RETRIES", str(config.DEFAULT_MAX_READ_RETRIES)),
-        ("MAX_RETRY_WAIT_SECONDS", f"{config.DEFAULT_MAX_RETRY_WAIT_SECONDS:g}"),
     ]
     assert [name for name, _ in defaults] == list(config.ENV_KEYS)
     lines = [f"  {name:<24} {value}" for name, value in defaults]
@@ -52,14 +47,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
 
-def _configure_logging(level: str, token: str, err: TextIO) -> tuple[logging.Handler, int]:
+def _configure_logging(token: str, err: TextIO) -> tuple[logging.Handler, int]:
     handler = logging.StreamHandler(err)
     handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
     handler.addFilter(RedactingFilter([token]))
     root = logging.getLogger()
     previous = root.level
     root.addHandler(handler)
-    root.setLevel(level)
+    root.setLevel(config.LOG_LEVEL)
     for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     return handler, previous
@@ -88,14 +83,14 @@ def main(
         return ExitCode.CONFIG
 
     secrets = (cfg.access_token,)
-    handler, previous_level = _configure_logging(cfg.log_level, cfg.access_token, err)
+    handler, previous_level = _configure_logging(cfg.access_token, err)
     try:
         client = ThreadsClient(
             access_token=cfg.access_token,
-            api_version=cfg.api_version,
-            timeout_seconds=cfg.http_timeout_seconds,
-            max_read_retries=cfg.max_read_retries,
-            max_retry_wait_seconds=cfg.max_retry_wait_seconds,
+            api_version=config.API_VERSION,
+            timeout_seconds=config.HTTP_TIMEOUT_SECONDS,
+            max_read_retries=config.MAX_READ_RETRIES,
+            max_retry_wait_seconds=config.MAX_RETRY_WAIT_SECONDS,
             read_only=cfg.dry_run,
             transport=transport,
         )

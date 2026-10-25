@@ -86,26 +86,26 @@ class ThreadsEdgeTests(unittest.TestCase):
         self.assertEqual(posts[0].action_at, datetime(2026, 1, 5, 10, 0, tzinfo=UTC))
 
     def test_foreign_or_missing_owner_aborts(self) -> None:
-        for owner in (
-            {"owner": {"id": "42"}},
-            {"owner": None},
-            {"owner": {}},
-            {"owner": "1000001"},
-        ):
-            _, client = threads_fake(post(**owner))
-            with self.assertRaises(OwnershipError, msg=str(owner)):
-                client.discover(Category.POST, OWNER)
-        record = post()
-        del record["owner"]
-        _, client = threads_fake(record)
-        with self.assertRaises(OwnershipError):
-            client.discover(Category.POST, OWNER)
+        for category, make_record in ((Category.POST, post), (Category.REPOST, repost)):
+            for owner in ({"id": "42"}, None, {}, "1000001"):
+                with self.subTest(category=category, owner=owner):
+                    _, client = threads_fake(make_record(owner=owner))
+                    with self.assertRaises(OwnershipError):
+                        client.discover(category, OWNER)
+            with self.subTest(category=category, missing_owner=True):
+                record = make_record()
+                del record["owner"]
+                _, client = threads_fake(record)
+                with self.assertRaises(OwnershipError):
+                    client.discover(category, OWNER)
 
     def test_malformed_timestamp_aborts_discovery(self) -> None:
-        for stamp in ("2026-01-01T00:00:00", "yesterday", None, 17):
-            _, client = threads_fake(post(timestamp=stamp))
-            with self.assertRaises(TimestampError, msg=str(stamp)):
-                client.discover(Category.POST, OWNER)
+        for category, make_record in ((Category.POST, post), (Category.REPOST, repost)):
+            for stamp in ("2026-01-01T00:00:00", "yesterday", None, 17):
+                with self.subTest(category=category, timestamp=stamp):
+                    _, client = threads_fake(make_record(timestamp=stamp))
+                    with self.assertRaises(TimestampError):
+                        client.discover(category, OWNER)
 
     def test_repost_uses_repost_timestamp_and_own_id(self) -> None:
         record = repost(reposted_post={"id": "8000001"})
@@ -117,28 +117,6 @@ class ThreadsEdgeTests(unittest.TestCase):
         self.assertIs(found[0].category, Category.REPOST)
         self.assertEqual(found[0].action_at, datetime(2026, 1, 1, tzinfo=UTC))
         self.assertIsNone(found[0].permalink)
-
-    def test_repost_foreign_or_missing_owner_aborts(self) -> None:
-        for owner in (
-            {"owner": {"id": "42"}},
-            {"owner": None},
-            {"owner": {}},
-            {"owner": "1000001"},
-        ):
-            _, client = threads_fake(repost(**owner))
-            with self.assertRaises(OwnershipError, msg=str(owner)):
-                client.discover(Category.REPOST, OWNER)
-        record = repost()
-        del record["owner"]
-        _, client = threads_fake(record)
-        with self.assertRaises(OwnershipError):
-            client.discover(Category.REPOST, OWNER)
-
-    def test_malformed_repost_timestamp_aborts(self) -> None:
-        for stamp in ("2026-01-01T00:00:00", "yesterday", None):
-            _, client = threads_fake(repost(timestamp=stamp))
-            with self.assertRaises(TimestampError, msg=str(stamp)):
-                client.discover(Category.REPOST, OWNER)
 
     def test_unclassifiable_record_aborts(self) -> None:
         record = post()

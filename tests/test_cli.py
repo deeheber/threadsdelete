@@ -31,6 +31,17 @@ class HelpTests(unittest.TestCase):
         self.assertIn("usage:", out.getvalue())
         self.assertIn("DRY_RUN", out.getvalue())
         self.assertIn("MAX_DELETIONS_PER_RUN", out.getvalue())
+        listed = out.getvalue().split("Environment variables (name, default):\n")[1]
+        self.assertEqual(
+            {line.split()[0] for line in listed.splitlines() if line.strip()},
+            {
+                "DRY_RUN",
+                "DAYS_AGO",
+                "THREADS_ACCESS_TOKEN",
+                "THREADS_USER_ID",
+                "MAX_DELETIONS_PER_RUN",
+            },
+        )
 
 
 def run_main(fake: FakeThreadsApi, env: dict[str, str] | None = None) -> tuple[int, str, str]:
@@ -71,6 +82,30 @@ class CliPreviewTests(unittest.TestCase):
         self.assertIn("Mode: DRY RUN", out)
         self.assertEqual({r.method for r in fake.requests}, {"GET"})
 
+    def test_internal_settings_ignore_legacy_environment(self) -> None:
+        fake = fixture_api()
+        code, _, _ = run_main(
+            fake,
+            {
+                **ENV,
+                "LOG_LEVEL": "invalid",
+                "THREADS_API_VERSION": "v99.0",
+                "HTTP_TIMEOUT_SECONDS": "0",
+                "MAX_READ_RETRIES": "invalid",
+                "MAX_RETRY_WAIT_SECONDS": "-1",
+            },
+        )
+        self.assertEqual(code, 0)
+        self.assertTrue(fake.requests)
+        for request in fake.requests:
+            with self.subTest(path=request.url.path):
+                self.assertEqual(
+                    request.extensions["timeout"],
+                    dict.fromkeys(
+                        ("connect", "read", "write", "pool"), main.config.HTTP_TIMEOUT_SECONDS
+                    ),
+                )
+
     def test_invalid_config_exits_2_without_network(self) -> None:
         fake = fixture_api()
         code, out, err = run_main(fake, {**ENV, "DAYS_AGO": "-3", "DRY_RUN": "maybe"})
@@ -98,14 +133,14 @@ class CliPreviewTests(unittest.TestCase):
 
     def test_token_never_printed(self) -> None:
         fake = fixture_api()
-        code, out, err = run_main(fake, {**ENV, "LOG_LEVEL": "DEBUG"})
+        code, out, err = run_main(fake)
         self.assertEqual(code, 0)
         self.assertNotIn(TOKEN, out + err)
 
         fake = FakeThreadsApi()
         body = {"error": {"message": f"Invalid token {TOKEN}", "code": 190}}
         fake.add("GET", "me", json_response(body, 401))
-        code, out, err = run_main(fake, {**ENV, "LOG_LEVEL": "DEBUG"})
+        code, out, err = run_main(fake)
         self.assertEqual(code, 3)
         self.assertNotIn(TOKEN, out + err)
 
@@ -151,7 +186,7 @@ class CliRemovalTests(unittest.TestCase):
         fake = fixture_api()
         body = {"error": {"message": f"token {TOKEN} expired", "code": 190}}
         fake.add("DELETE", "9000001", json_response(body, 401))
-        code, out, err = run_main(fake, {**REMOVE_ENV, "LOG_LEVEL": "DEBUG"})
+        code, out, err = run_main(fake, REMOVE_ENV)
         self.assertEqual(code, 3)
         self.assertNotIn(TOKEN, out + err)
         self.assertIn("=== Summary ===", out)
@@ -201,12 +236,12 @@ class CliSafetyWiringTests(unittest.TestCase):
             raise ApiError("stop")
 
         with mock.patch.object(main.cleanup, "run", stub):
-            _, out, err = run_main(FakeThreadsApi(), {**ENV, "LOG_LEVEL": "DEBUG"})
+            _, out, err = run_main(FakeThreadsApi())
         self.assertNotIn(TOKEN, out + err)
         self.assertIn("[REDACTED]", err)
 
-    def test_httpx_request_logs_suppressed_at_debug(self) -> None:
-        _, _, err = run_main(fixture_api(), {**ENV, "LOG_LEVEL": "DEBUG"})
+    def test_httpx_request_logs_suppressed(self) -> None:
+        _, _, err = run_main(fixture_api())
         self.assertNotIn("HTTP Request:", err)
 
     def test_identity_read_failure_exits_1(self) -> None:
@@ -215,7 +250,8 @@ class CliSafetyWiringTests(unittest.TestCase):
         down = FakeThreadsApi()
         down.add("GET", "me", error_response(2, 503), repeat=True)
         for fake in (bodyless, down):
-            code, out, err = run_main(fake, {**ENV, "MAX_RETRY_WAIT_SECONDS": "0"})
+            with mock.patch.object(main.config, "MAX_RETRY_WAIT_SECONDS", 0):
+                code, out, err = run_main(fake)
             self.assertEqual(code, 1)
             self.assertIn("Error:", err)
             self.assertNotIn(TOKEN, out + err)

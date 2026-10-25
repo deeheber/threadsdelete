@@ -1,12 +1,12 @@
 # threadsdelete
 
-Cleans up your own old [Threads](https://www.threads.com) content with Meta's official Threads API. Content older than a configurable number of days (default 90) is removed, locally or from a weekly GitHub Actions run. Modeled on [blueskydelete](https://github.com/deeheber/blueskydelete).
+Cleans up your own old [Threads](https://www.threads.com) content with Meta's official Threads API. Runs locally or weekly through GitHub Actions, removing content older than `DAYS_AGO` (default 90).
 
 **There is no undo.** A removed post is gone. The tool previews by default (`DRY_RUN=true`) and removes only when you set `DRY_RUN=false`.
 
 Feasibility findings and API contracts: [docs/RESEARCH.md](docs/RESEARCH.md). Meta app and token setup: [docs/META_SETUP.md](docs/META_SETUP.md).
 
-> Status: tested offline against synthetic fixtures, and run live on the owner's account on 2026-10-25 through GitHub Actions (a preview, then a removal of posts and replies). Remaining live checks are in `docs/RESEARCH.md` under "Untested and pending".
+> Tested offline with synthetic fixtures and live through GitHub Actions on 2026-10-25. See [live observations](docs/RESEARCH.md#live-observations) and [pending checks](docs/RESEARCH.md#untested-and-pending).
 
 ## Quick start
 
@@ -16,26 +16,23 @@ Feasibility findings and API contracts: [docs/RESEARCH.md](docs/RESEARCH.md). Me
 2. Install dependencies: `uv sync --locked`
 3. Create a Meta app and a long-lived token by following [docs/META_SETUP.md](docs/META_SETUP.md).
 4. Copy the sample settings: `cp .env.sample .env` (Windows: `copy .env.sample .env`), then edit `.env`. It is git-ignored; never commit it.
-5. Preview: `uv run --env-file .env main.py` (or `./scripts/run.sh`).
+5. Preview: `DRY_RUN=true uv run --env-file .env main.py` (or `DRY_RUN=true ./scripts/run.sh`).
 
 `uv run main.py --help` works without credentials or network.
 
 ## Settings
 
-Set these in `.env`, in the shell, or (for Actions) as repository Secrets/Variables. A value set in the process environment overrides the same key in `.env`. An empty value counts as unset and falls back to the default, which is how unset Actions Variables behave.
+Set these in `.env`, in the shell, or (for Actions) as repository Secrets/Variables. A value set in the process environment overrides the same key in `.env`. Empty values, including unset Actions Variables, use the default.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `DRY_RUN` | `true` | Only an explicit `false` (any case) removes content. Only `true`/`false` are accepted. |
 | `DAYS_AGO` | `90` | Non-negative integer, at most 36500. `0` includes everything up to run start. |
-| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`, case-insensitive. |
 | `THREADS_ACCESS_TOKEN` | required | Long-lived Threads user token. A secret. |
 | `THREADS_USER_ID` | required | Your numeric Threads user ID; must match the token's account. |
-| `THREADS_API_VERSION` | `v1.0` | Threads API version. |
 | `MAX_DELETIONS_PER_RUN` | `100` | ⚠️ ASSUMPTION: removal attempts per run across all categories; `0` allows none. |
-| `HTTP_TIMEOUT_SECONDS` | `30` | ⚠️ ASSUMPTION: per-request timeout. |
-| `MAX_READ_RETRIES` | `3` | ⚠️ ASSUMPTION: retries for read requests only. Removals are never retried. |
-| `MAX_RETRY_WAIT_SECONDS` | `60` | ⚠️ ASSUMPTION: longest single retry wait; a longer `Retry-After` stops the read. |
+
+API version (`v1.0`), logging (`INFO`), timeout (30 seconds), read retries (3), and maximum retry wait (60 seconds) are internal constants in `threadsdelete/config.py`. The timeout and retry values remain assumptions pending live measurement. Older `.env` entries and repository Variables for these settings are ignored; they can be removed.
 
 ## Usage
 
@@ -91,25 +88,15 @@ One UTC run-start time is captured per run. An item is eligible when `its time <
 
 ## Quota and backlog
 
-Threads limits a profile to 100 deletions per rolling 24 hours. Before removing, the tool reads your remaining deletion quota and removes oldest first, up to the lower of `MAX_DELETIONS_PER_RUN` and the remaining quota. The rest is reported as `deferred` and picked up by a later run: at the default cap, a backlog of 500 takes 5 weekly runs. If the quota cannot be read, the report says `Quota: unavailable` and the run stays within the cap and stops at the API's own quota error. Repost removals count against `MAX_DELETIONS_PER_RUN` and against the same 100-per-24-hours deletion quota. The cap is not a rolling-quota tracker; runs close together can still hit the API limit.
+Posts, quotes, replies and reposts share a quota of 100 deletions per rolling 24 hours. The tool reads the remaining quota and removes oldest first, up to that quota or `MAX_DELETIONS_PER_RUN`, whichever is lower. Remaining items are reported as `deferred` for a later run; at the default cap, 500 items take 5 weekly runs.
+
+If quota inspection fails, the report says `Quota: unavailable`; removal stays within the cap and stops at the API's quota error. The cap does not track rolling usage, so closely spaced runs can still hit the limit.
 
 Removals run one at a time and are never retried. If one ends with an unknown outcome (timeout, connection loss, server error), the run stops, reports it, and exits 1; the next run rediscovers what is left.
 
 ## Commands
 
-| Purpose | Command |
-| --- | --- |
-| Install | `uv sync --locked` |
-| Typecheck | `uv run mypy threadsdelete main.py` |
-| Lint | `uv run ruff check .` |
-| Format check | `uv run ruff format --check .` |
-| Offline tests | `uv run python -m unittest discover -s tests -v` |
-| Targeted tests (dotted module/class) | `uv run python -m unittest {filter} -v` |
-| Build/syntax check | `uv run python -m compileall -q threadsdelete main.py` |
-| Offline smoke | `uv run main.py --help` |
-| Budget measurements | `uv run python -c "from tests.test_budgets import report; report()"` |
-
-Tests are offline and use synthetic fixtures.
+See [contributor commands](CLAUDE.md#commands) for checks and targeted tests. Tests run offline with synthetic fixtures.
 
 ## Scheduled cleanup with GitHub Actions
 
@@ -117,7 +104,7 @@ Two workflows live in `.github/workflows/`: `ci.yml` (offline checks on push and
 
 1. In the repository go to Settings, Secrets and variables, Actions.
 2. **Secret**: `THREADS_ACCESS_TOKEN`.
-3. **Variables**: `THREADS_USER_ID`, and optionally `DRY_RUN`, `DAYS_AGO`, `LOG_LEVEL`, `THREADS_API_VERSION`, `MAX_DELETIONS_PER_RUN`, `HTTP_TIMEOUT_SECONDS`, `MAX_READ_RETRIES`, `MAX_RETRY_WAIT_SECONDS`. A missing Variable resolves to the default above. With `DRY_RUN` unset, scheduled runs are previews; set the Variable to `false` to enable real scheduled removal.
+3. **Variables**: `THREADS_USER_ID`, and optionally `DRY_RUN`, `DAYS_AGO`, `MAX_DELETIONS_PER_RUN`. A missing Variable resolves to the default above. With `DRY_RUN` unset, scheduled runs are previews; set the Variable to `false` to enable real scheduled removal.
 4. Schedule: `cron: '0 5 * * 5'` (Fridays 05:00 UTC), edited directly in `cleanup-feed.yml`. The job's `timeout-minutes: 15` is an assumption you can change there too.
 5. Manual run: Actions tab, "Threads cleanup", Run workflow. The `dry_run` input defaults to `true` (forced preview); choose `variable` to follow the `DRY_RUN` Variable.
 6. Check results under Actions run history; each run writes a sanitized summary on the run page (the `=== Summary ===` block, or the last log lines on failure). Enable failure notifications in your GitHub notification settings for Actions.
@@ -134,7 +121,7 @@ Runs are serialized (`concurrency: cleanup-feed`, `cancel-in-progress: false`). 
 
 ## Token maintenance
 
-Long-lived tokens last 60 days and this tool does not renew them. Before expiry, replace `THREADS_ACCESS_TOKEN` in your local `.env` and in the GitHub secret by following [docs/META_SETUP.md](docs/META_SETUP.md). Once a token has expired the scheduled run fails with exit status 3 until you replace it. To revoke access, remove the app from your Threads account's website permissions.
+Tokens expire after 60 days; the tool does not renew them. Follow [Meta setup](docs/META_SETUP.md#8-expiry-and-manual-renewal) to renew the token in both `.env` and the GitHub Secret, or [revoke access](docs/META_SETUP.md#9-revocation).
 
 ## Troubleshooting
 
@@ -142,7 +129,7 @@ Long-lived tokens last 60 days and this tool does not renew them. Before expiry,
 | --- | --- |
 | Exit 2, "Configuration error: ..." | A setting is missing or invalid; the message names the key. |
 | Exit 3, "Authentication failure" | Token expired or revoked, missing permission (`threads_basic`, `threads_read_replies`, `threads_delete`), or `THREADS_USER_ID` is not the token's account. |
-| Exit 1, "Discovery: INCOMPLETE" | A read failed, a timestamp was malformed, or ownership was ambiguous. Nothing was removed. Re-run; use `LOG_LEVEL=DEBUG` for detail. |
+| Exit 1, "Discovery: INCOMPLETE" | A read failed, a timestamp was malformed, or ownership was ambiguous. Nothing was removed. Re-run after resolving the reported problem. |
 | Exit 1, an `unknown` line | A removal timed out or got a server error. Check Threads, then re-run. |
 | Items stay `deferred` | The per-run cap or the 24-hour deletion quota was reached; they are picked up next run. |
 | `Quota: unavailable` | The quota endpoint failed; the run stays within `MAX_DELETIONS_PER_RUN`. |
@@ -151,7 +138,7 @@ Long-lived tokens last 60 days and this tool does not renew them. Before expiry,
 
 Reference project: [deeheber/blueskydelete](https://github.com/deeheber/blueskydelete).
 
-Built with [Kūkulu](https://kukulu.tech) ([GitHub](https://github.com/DisplaceTech/kukulu)), which planned, implemented and reviewed it from [the original spec](docs/flights/threadsdelete/SPEC.md). The build's plan, progress log and reviews are in [docs/flights/threadsdelete/](docs/flights/threadsdelete/).
+Built with [Kūkulu](https://kukulu.tech) ([GitHub](https://github.com/DisplaceTech/kukulu)); [original spec and build history](docs/flights/threadsdelete/).
 
 ## License
 

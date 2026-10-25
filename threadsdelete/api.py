@@ -389,7 +389,7 @@ class ThreadsClient:
             raise ValueError(f"unsupported operation: {candidate.operation}")
         try:
             response = self._send("DELETE", candidate.target_id, {})
-        except httpx.TimeoutException, httpx.TransportError:
+        except httpx.TransportError:
             raise self._fail(
                 UnknownOutcomeError, "removal request failed; outcome unknown"
             ) from None

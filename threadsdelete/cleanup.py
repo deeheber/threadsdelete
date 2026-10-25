@@ -12,7 +12,6 @@ from threadsdelete.api import (
     AuthError,
     Identity,
     ItemError,
-    OwnershipError,
     QuotaExceededError,
     ThreadsClient,
     UnknownOutcomeError,
@@ -61,7 +60,7 @@ def discover_all(client: ThreadsClient, identity: Identity) -> Discovery:
             found, scanned = client.discover(category, identity)
         except AuthError:
             raise
-        except (ApiError, TimestampError, OwnershipError) as exc:
+        except (ApiError, TimestampError) as exc:
             result.complete = False
             result.problem = str(exc) or type(exc).__name__
             return result
@@ -99,13 +98,25 @@ def _candidate_line(label: str, candidate: Candidate) -> str:
 
 def _summary_lines(summary: RunSummary) -> list[str]:
     lines = [SUMMARY_HEADER]
-    for category, c in summary.counts.items():
+    for category, counts in summary.counts.items():
         lines.append(
-            f"{category}: scanned={c.scanned} eligible={c.eligible} "
-            f"would_remove={c.would_remove} removed={c.removed} failed={c.failed} "
-            f"unknown_outcome={c.unknown_outcome} deferred={c.deferred}"
+            f"{category}: scanned={counts.scanned} eligible={counts.eligible} "
+            f"would_remove={counts.would_remove} removed={counts.removed} failed={counts.failed} "
+            f"unknown_outcome={counts.unknown_outcome} deferred={counts.deferred}"
         )
     return lines
+
+
+def _print_report(summary: RunSummary, problem: str | None, quota_line: str, out: TextIO) -> None:
+    for line in _summary_lines(summary):
+        print(line, file=out)
+    if summary.discovery_complete:
+        print("Discovery: complete", file=out)
+    else:
+        print(f"Discovery: INCOMPLETE \u2014 {problem} (no changes made)", file=out)
+    print(quota_line, file=out)
+    for note in summary.notes:
+        print(f"Note: {note}", file=out)
 
 
 def _check_quota(
@@ -132,7 +143,6 @@ def _remove_all(
     """Sequential removal. Returns candidates left unattempted and any auth failure."""
     for index, candidate in enumerate(allowed):
         counts = summary.counts[candidate.category]
-        left = allowed[index + 1 :]
         try:
             client.remove(candidate)
         except ItemError as exc:
@@ -145,7 +155,7 @@ def _remove_all(
             counts.unknown_outcome += 1
             print(_candidate_line("unknown", candidate) + f"  ({exc})", file=out)
             summary.notes.append("stopped after unknown outcome; will rediscover next run")
-            return left, None
+            return allowed[index + 1 :], None
         except AuthError as exc:
             summary.auth_failed = True
             summary.notes.append("stopped: authentication or permission failure")
@@ -204,15 +214,7 @@ def run(config: Config, client: ThreadsClient, run_started_at: datetime, out: Te
         summary.counts[candidate.category].deferred += 1
         print(_candidate_line("deferred", candidate), file=out)
 
-    for line in _summary_lines(summary):
-        print(line, file=out)
-    if summary.discovery_complete:
-        print("Discovery: complete", file=out)
-    else:
-        print(f"Discovery: INCOMPLETE \u2014 {problem} (no changes made)", file=out)
-    print(quota_line, file=out)
-    for note in summary.notes:
-        print(f"Note: {note}", file=out)
+    _print_report(summary, problem, quota_line, out)
     if auth_error is not None:
         raise auth_error
     return summary

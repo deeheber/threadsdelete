@@ -64,7 +64,6 @@ class TimestampTests(unittest.TestCase):
 class SelectionTests(unittest.TestCase):
     def test_reposts_use_the_delete_operation(self) -> None:
         self.assertIs(cand(Category.REPOST, "5", RUN_START).operation, Operation.DELETE)
-        self.assertEqual({o.value for o in Operation}, {"delete", "unlike"})
         cutoff = compute_cutoff(RUN_START, 10)
         base = RUN_START - timedelta(days=30)
         with self.assertRaises(SelectionError):
