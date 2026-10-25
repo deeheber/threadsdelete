@@ -1,6 +1,6 @@
 # threadsdelete
 
-Personal Threads cleanup tool (official Meta Threads API only) that removes the owner's own content by age, locally and from a weekly GitHub Actions cron. Source of truth: `docs/SPEC.md`, which wins over code comments. The first build's plan, progress log and reviews are archived in `docs/flights/threadsdelete/`.
+Personal Threads cleanup tool (official Meta Threads API only) that removes the owner's own content by age, locally and from a weekly GitHub Actions cron. Source of truth: `docs/flights/threadsdelete/SPEC.md` (the original build) plus `docs/SPEC.md` (the current change, which wins where they differ); both win over code comments. The first build's plan, progress log and reviews are archived in `docs/flights/threadsdelete/`.
 
 ## Principles
 
