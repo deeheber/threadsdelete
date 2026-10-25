@@ -2,7 +2,7 @@
 
 ## Summary
 
-Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported (documentation findings): posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. Reposts: removal is undocumented, but a live check on 2026-10-24 showed `DELETE /{id}` removes them (see Live observations). Unsupported: likes (no API at all). Untested: most behavior live, because the original research used no credentials; notably quote deletion and the error code of the deletion limit (see Untested and pending).
+Personal cleanup appears free of API fees: no fee, subscription or paid tier is documented for the Threads API, and an app with the owner as Threads Tester can act on the owner's own account without App Review. Supported: posts, media and carousel posts, quotes and replies, enumerated with cursor pagination and creation timestamps and removed with `DELETE /{id}` under a documented 100-per-24-hours deletion quota that can be inspected through `threads_publishing_limit`. `DELETE /{id}` is documented for posts and live-verified for posts and replies; for quotes it is inferred and not yet tested. Reposts: removal is undocumented, but a live check on 2026-10-24 showed `DELETE /{id}` removes them. Unsupported: likes (no documented list, timestamp or unlike endpoint; newer endpoints unknown). See Live observations for what has been verified and Untested and pending for what has not, notably quote deletion and the error code of the deletion limit.
 
 ## Sources
 
@@ -44,7 +44,7 @@ Retrieved 2026-10-23 with `curl` (no credentials, no token). "OK" means HTTP 200
 - [doc] `threads_delete`: required for any delete call, and (per the overview) for the `delete_quota_usage` and `delete_config` fields of `threads_publishing_limit`. Source: https://developers.facebook.com/documentation/threads/posts/delete-posts and overview.
 - [doc] `threads_read_replies`: required for GET calls to reply endpoints (`/{user-id}/replies`). Source: get-started.
 - [doc] `threads_manage_replies` (POST to reply endpoints), `threads_content_publish` (publishing), `threads_manage_insights`: not needed by this tool.
-- [doc] The authorization-window documentation lists `scope` values `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` and does not list `threads_delete`, while the delete page requires it. Whether `threads_delete` must be requested in `scope` or is granted differently is Unknown; META_SETUP must tell the owner to request `threads_basic,threads_read_replies,threads_delete` and verify the granted scopes live (pending). Source: get-started-access-tokens-and-permissions vs delete-posts (2026-10-23).
+- [doc] The authorization-window documentation lists `scope` values `threads_basic, threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights` and does not list `threads_delete`, while the delete page requires it. [live, 2026-10-24] With `threads_delete` enabled under the use case's "Permissions and features" and `threads_basic,threads_read_replies,threads_delete` requested in `scope`, the resulting token could delete (see Live observations). Whether either step alone is enough is untested. Source: get-started-access-tokens-and-permissions vs delete-posts (2026-10-23).
 - [doc] App Review is not needed for own-account use through a tester role (see above).
 - [doc] Reading `owner` is "only available on top-level posts that you own".
 
@@ -221,7 +221,7 @@ Sources: https://developers.facebook.com/documentation/threads/overview ; https:
 
 ## Live observations
 
-The original research (2026-10-23) used no credentials. Live checks on the owner's account on 2026-10-24:
+The original research (2026-10-23) used no credentials. Live checks on the owner's account (2026-10-24 unless a bullet gives another date):
 
 - `GET /me/threads` returned 51 `REPOST_FACADE` records, all with `owner.id` equal to the user's ID and a `timestamp`; `reposted_post` was `null` on all of them.
 - A new repost of a post about 15 hours old had `timestamp` set to the moment of the repost.
