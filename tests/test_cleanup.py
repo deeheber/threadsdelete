@@ -72,7 +72,7 @@ class PreviewTests(unittest.TestCase):
         self.assertIn("Account: @example_owner (1000001)", text)
         self.assertIn("Cutoff (UTC): 2026-07-25T05:00:00Z", text)
         self.assertIn("Mode: DRY RUN (no changes will be made)", text)
-        self.assertIn("Excluded: repost", text)
+        self.assertNotIn("Excluded: repost", text)
         self.assertIn("Excluded: like", text)
         listed = lines_starting(text, "would remove", "deferred")
         self.assertEqual(
@@ -84,13 +84,66 @@ class PreviewTests(unittest.TestCase):
         counts = {c: (v.scanned, v.eligible, v.would_remove) for c, v in summary.counts.items()}
         self.assertEqual(
             counts,
-            {Category.POST: (5, 3, 3), Category.QUOTE: (1, 1, 1), Category.REPLY: (2, 1, 1)},
+            {
+                Category.POST: (4, 3, 3),
+                Category.QUOTE: (1, 1, 1),
+                Category.REPOST: (1, 0, 0),
+                Category.REPLY: (2, 1, 1),
+            },
         )
         self.assertIn("=== Summary ===", text)
-        self.assertIn("post: scanned=5 eligible=3 would_remove=3", text)
+        self.assertIn("post: scanned=4 eligible=3 would_remove=3", text)
+        self.assertIn("repost: scanned=1 eligible=0 would_remove=0", text)
+        self.assertNotIn("9000005", [line.split("  ")[2] for line in listed])
         self.assertIn("Discovery: complete", text)
         self.assertIn("Quota: available (delete: 63 remaining, rolling 24 hours)", text)
         self.assertTrue(summary.discovery_complete)
+
+    def test_preview_lists_eligible_repost(self) -> None:
+        fake = fixture_api(eligible_repost=True)
+        text, _ = preview(fake)
+        listed = lines_starting(text, "would remove", "deferred")
+        self.assertEqual([line.split("  ")[2] for line in listed], ELIGIBLE_ORDER + ["9000007"])
+        self.assertIn(
+            "would remove  repost  9000007  https://www.threads.com/@example_owner/post/AAA7",
+            text,
+        )
+        self.assertIn("repost: scanned=2 eligible=1 would_remove=1", text)
+        self.assertNotIn("9000005", [line.split("  ")[2] for line in listed])
+        self.assertEqual({r.method for r in fake.requests}, {"GET"})
+
+    def test_repost_eligibility_uses_repost_timestamp(self) -> None:
+        def record(item: str, stamp: str) -> dict[str, object]:
+            return {
+                "id": item,
+                "media_type": "REPOST_FACADE",
+                "timestamp": stamp,
+                "owner": {"id": "1000001"},
+            }
+
+        fake = FakeThreadsApi()
+        fake.add("GET", "me", json_response(load_fixture("me.json")))
+        fake.add(
+            "GET",
+            "me/threads",
+            json_response(
+                {
+                    "data": [
+                        record("9100001", "2026-07-25T05:00:00+0000"),
+                        record("9100002", "2026-07-25T05:00:01+0000"),
+                    ]
+                }
+            ),
+        )
+        fake.add("GET", "me/replies", json_response({"data": []}))
+        fake.add(
+            "GET", "1000001/threads_publishing_limit", json_response(load_fixture("quota.json"))
+        )
+        text, summary = preview(fake)
+        listed = lines_starting(text, "would remove", "deferred")
+        self.assertEqual([line.split("  ")[2] for line in listed], ["9100001"])
+        self.assertEqual(summary.counts[Category.REPOST].scanned, 2)
+        self.assertEqual(summary.counts[Category.REPOST].eligible, 1)
 
     def test_identity_mismatch_stops_before_discovery(self) -> None:
         fake = FakeThreadsApi()
@@ -142,8 +195,9 @@ class PreviewTests(unittest.TestCase):
 
 class RemovalTests(unittest.TestCase):
     def test_dry_run_sends_no_mutation_for_any_category(self) -> None:
-        fake = fixture_api()
+        fake = fixture_api(eligible_repost=True)
         text, summary = preview(fake)
+        self.assertEqual(summary.counts[Category.REPOST].would_remove, 1)
         self.assertEqual({r.method for r in fake.requests}, {"GET"})
         self.assertEqual(len(fake.calls("GET", "1000001/threads_publishing_limit")), 1)
         self.assertEqual({c for c, v in summary.counts.items() if v.eligible}, set(summary.counts))
@@ -162,6 +216,55 @@ class RemovalTests(unittest.TestCase):
         self.assertEqual(len(lines_starting(text, "removed")), 3)
         self.assertEqual(len(lines_starting(text, "deferred")), 2)
         self.assertEqual(sum(v.removed for v in summary.counts.values()), 3)
+
+    def test_real_run_removes_eligible_repost_by_record_id(self) -> None:
+        fake = fixture_api(eligible_repost=True)
+        for item in ELIGIBLE_ORDER:
+            fake.add("DELETE", item, OK)
+        fake.add("DELETE", "9000007", json_response({"success": True, "deleted_id": "9000007"}))
+        text, summary, error = real_run(fake)
+        assert summary is not None
+        self.assertIsNone(error)
+        self.assertEqual(deletes(fake), ELIGIBLE_ORDER + ["9000007"])
+        self.assertEqual(summary.counts[Category.REPOST].removed, 1)
+        self.assertIn("removed  repost  9000007", text)
+        self.assertEqual(cleanup.exit_status(summary), ExitCode.OK)
+
+    def test_repost_counts_against_cap(self) -> None:
+        fake = fixture_api(eligible_repost=True)
+        for item in ELIGIBLE_ORDER:
+            fake.add("DELETE", item, OK)
+        text, summary, _ = real_run(fake, cap=5)
+        assert summary is not None
+        self.assertEqual(deletes(fake), ELIGIBLE_ORDER)
+        self.assertIn("deferred  repost  9000007", text)
+        self.assertEqual(summary.counts[Category.REPOST].deferred, 1)
+        self.assertEqual(cleanup.exit_status(summary), ExitCode.OK)
+
+    def test_foreign_repost_marks_discovery_incomplete(self) -> None:
+        owned = {
+            "id": "9200001",
+            "media_type": "TEXT_POST",
+            "timestamp": "2026-01-05T10:00:00+0000",
+            "owner": {"id": "1000001"},
+            "is_quote_post": False,
+        }
+        foreign = {
+            "id": "9200002",
+            "media_type": "REPOST_FACADE",
+            "timestamp": "2026-01-06T10:00:00+0000",
+            "owner": {"id": "42"},
+        }
+        fake = FakeThreadsApi()
+        fake.add("GET", "me", json_response(load_fixture("me.json")))
+        fake.add("GET", "me/threads", json_response({"data": [owned, foreign]}))
+        fake.add("GET", "me/replies", json_response({"data": []}))
+        text, summary, _ = real_run(fake)
+        assert summary is not None
+        self.assertFalse(summary.discovery_complete)
+        self.assertIn("Discovery: INCOMPLETE", text)
+        self.assertEqual(deletes(fake), [])
+        self.assertEqual(cleanup.exit_status(summary), ExitCode.FAILURE)
 
     def test_quota_smaller_than_cap_defers_rest(self) -> None:
         fake = fixture_api(quota=False)

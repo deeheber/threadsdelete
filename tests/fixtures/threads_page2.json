@@ -5,7 +5,7 @@
      "is_quote_post": true},
     {"id": "9000005", "media_type": "REPOST_FACADE", "timestamp": "2026-09-30T09:00:00+0000",
      "permalink": "https://www.threads.com/@example_owner/post/AAA5",
-     "reposted_post": {"id": "8000001"}},
+     "owner": {"id": "1000001"}, "reposted_post": null},
     {"id": "9000006", "media_type": "TEXT_POST", "timestamp": "2026-10-20T09:00:00+0000",
      "permalink": "https://www.threads.com/@example_owner/post/AAA6", "owner": {"id": "1000001"},
      "is_quote_post": false}
