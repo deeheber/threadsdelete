@@ -45,7 +45,7 @@ Any other arguments print a usage line and exit 2.
 - No token ever appears in any process's arguments. Send it through stdin (`printf '%s' "$token" | curl --get --data-urlencode access_token@- ...`, with no trailing newline) or the environment (for example awk's `ENVIRON`, never `awk -v`).
 - No token is ever printed, with one exception: when `GITHUB_ACTIONS=true`, print `::add-mask::<new token>` right after the refresh response is parsed, before any other use. Never print it in local mode.
 - Response bodies are written to files in a `mktemp -d` directory, never to stdout. Temporary files are removed on exit (`trap`).
-- `curl`, `jq` and `gh` are called by name from `PATH`, with a timeout on every `curl` and no redirect-following flag.
+- `curl`, `jq` and `gh` are called by name from `PATH`, with a timeout on every `curl` and no redirect-following flag. Every `curl` call starts with `-q` as its first argument, so a user `.curlrc` can't turn on verbose output (which would print the token-bearing URL) or redirect following.
 
 **Steps, in order.** Any failure exits non-zero right away, and nothing later runs. The destination is never touched before step 6.
 
@@ -94,6 +94,7 @@ Isolation (the `tests/__init__.py` socket guard only covers Python, not subproce
 
 Both modes:
 - No token appears in any recorded `curl` or `gh` argument, and the old token never appears in stdout or stderr.
+- The first argument of every recorded `curl` call is `-q`.
 - Refresh failures, each followed by no further operations, `curl` called once (no retry), and the destination unchanged:
   - an HTTP error in either error shape;
   - malformed JSON;
@@ -124,6 +125,7 @@ File mode:
 
 - `CLAUDE.md`:
   - Replace the `no-token-renewal-or-app-secret` bullet with the rules from §7.
+  - Reword the `no-url-outside-api` bullet: in the Python package, URL literals appear only in `threadsdelete/api.py`; `scripts/refresh-token.sh` may contain the two `graph.threads.com` URLs from §4.1.
   - Principles: "the Python package never refreshes tokens; only `scripts/refresh-token.sh` does".
   - Add `./scripts/refresh-token.sh` to the live commands that need the owner's say-so.
   - Under Commands, note that the offline tests need `jq` on `PATH`.
@@ -147,6 +149,7 @@ In `docs/kukulu.json`, set `policies.archive` to `true` and `policies.finalize` 
 
 Copy `constraints` from `docs/flights/repost-removal/kukulu.json`, with these changes:
 - Drop `"from": "P1-01"` from `no-unrepost-operation`.
+- Widen `no-url-outside-api` to `scripts/` as well, excluding `scripts/refresh-token.sh` (and still `threadsdelete/api.py`).
 - Replace `no-token-renewal-or-app-secret` with:
   - `no-token-refresh-outside-script`: `refresh_access_token|th_refresh_token` in `threadsdelete/`, `main.py`, `scripts/`, `.github/workflows/`, excluding `scripts/refresh-token.sh`.
   - `no-app-secret-or-exchange`: `th_exchange_token|client_secret|APP_SECRET` in `threadsdelete/`, `main.py`, `scripts/`, `.github/workflows/`.
