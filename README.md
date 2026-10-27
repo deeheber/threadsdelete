@@ -121,7 +121,7 @@ Runs are serialized (`concurrency: cleanup-feed`, `cancel-in-progress: false`). 
 
 ## Token maintenance
 
-Tokens expire after 60 days; the tool does not renew them. Follow [Meta setup](docs/META_SETUP.md#8-expiry-and-manual-renewal) to renew the token in both `.env` and the GitHub Secret, or [revoke access](docs/META_SETUP.md#9-revocation).
+Tokens expire after 60 days; the tool does not renew them. Follow [Meta setup](docs/META_SETUP.md#8-expiry-and-refresh) to renew the token in both `.env` and the GitHub Secret, or [revoke access](docs/META_SETUP.md#9-revocation).
 
 ## Troubleshooting
 

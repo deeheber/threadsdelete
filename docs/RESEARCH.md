@@ -57,7 +57,9 @@ Retrieved 2026-10-23 with `curl` (no credentials, no token). "OK" means HTTP 200
 - [doc] Short-lived to long-lived: `GET https://graph.threads.com/access_token?grant_type=th_exchange_token&client_secret=<APP_SECRET>&access_token=<SHORT_LIVED>`; response `{"access_token", "token_type": "bearer", "expires_in": <seconds>}` (about 5183944, 60 days). Server-side only because it carries the app secret. An expired short-lived token cannot be exchanged.
 - [doc] Refresh: `GET https://graph.threads.com/refresh_access_token?grant_type=th_refresh_token&access_token=<LONG_LIVED>`; allowed when the token is at least 24 hours old and not expired, and `threads_basic` is granted; the refreshed token is valid 60 days from refresh. Tokens not refreshed within 60 days expire and cannot be refreshed.
 - [doc] Revocation: no revocation endpoint was found in the documentation read. The owner removes the app under Threads Account Settings > Website permissions, or removes the tester role in the App Dashboard. Specific revocation endpoint: Unknown.
-- This tool never exchanges or refreshes tokens (SPEC non-goal); these calls are for the manual steps in `docs/META_SETUP.md` only.
+- The cleanup tool never exchanges or refreshes tokens. `scripts/refresh-token.sh` calls the refresh endpoint (monthly in Actions, or on demand locally); the exchange stays a manual step in `docs/META_SETUP.md`.
+- [doc] The long-lived-tokens page (re-read 2026-10-25) confirms the refresh endpoint and its success fields (`access_token`, `token_type`, `expires_in`).
+- [doc] GitHub: `GITHUB_TOKEN` cannot write repository secrets; a fine-grained personal access token with "Secrets: read and write" can. Actions sets `GITHUB_ACTIONS=true`.
 - Sources: https://developers.facebook.com/documentation/threads/get-started/get-access-tokens-and-permissions and .../long-lived-tokens (2026-10-23).
 
 ## Content categories
@@ -75,7 +77,7 @@ Unsupported categories are documented here and omitted from the implementation (
 
 ## Comparison with blueskydelete
 
-blueskydelete (README and main.py read 2026-10-23, https://github.com/deeheber/blueskydelete) cleans three collections: posts, reposts and likes, filtered by age, with `DRY_RUN`, `DAYS_AGO` and `LOG_LEVEL`. Threads parity: posts yes (plus quotes, media and carousels, and replies as SPEC extras); reposts yes (live-verified 2026-10-24); likes no (no documented API). Bluesky's age filter uses each record's own creation time, which maps to `timestamp` for Threads posts and replies. Bluesky authenticates with username and app password; Threads needs a manually replaced long-lived user token (60 days).
+blueskydelete (README and main.py read 2026-10-23, https://github.com/deeheber/blueskydelete) cleans three collections: posts, reposts and likes, filtered by age, with `DRY_RUN`, `DAYS_AGO` and `LOG_LEVEL`. Threads parity: posts yes (plus quotes, media and carousels, and replies as SPEC extras); reposts yes (live-verified 2026-10-24); likes no (no documented API). Bluesky's age filter uses each record's own creation time, which maps to `timestamp` for Threads posts and replies. Bluesky authenticates with username and app password; Threads needs a long-lived user token (60 days), refreshed monthly by the "Refresh token" workflow (or locally by `scripts/refresh-token.sh`).
 
 ## Contracts
 
@@ -99,7 +101,7 @@ Sources: https://developers.facebook.com/docs/graph-api/results ; https://develo
 
 ### Errors
 
-[doc] Body shape (Graph API): `{"error": {"message": "...", "type": "OAuthException", "code": 190, "error_subcode": 460, "error_user_title": "...", "error_user_msg": "...", "fbtrace_id": "..."}}`. The Threads OAuth token endpoints use a different shape, `{"error_type", "code", "error_message"}`, but this tool never calls them.
+[doc] Body shape (Graph API): `{"error": {"message": "...", "type": "OAuthException", "code": 190, "error_subcode": 460, "error_user_title": "...", "error_user_msg": "...", "fbtrace_id": "..."}}`. The Threads OAuth token endpoints use a different shape, `{"error_type", "code", "error_message"}`, but the cleanup tool never calls them. `scripts/refresh-token.sh` calls the refresh endpoint and reads both shapes, printing only the HTTP status and the integer `code`/`error_subcode`.
 Classification used by the client (code from `error.code`):
 
 | Condition | Codes / status | Class |
@@ -191,7 +193,7 @@ Sources: https://developers.facebook.com/documentation/threads/overview ; https:
 
 - [doc] Short-lived 1 hour; long-lived 60 days; refresh extends to 60 days when the token is at least 24 hours old and unexpired; a token not refreshed within 60 days is dead and the owner repeats the authorization flow.
 - [doc] Permission grants last 90 days; for public profiles refreshing the token extends the grant by another 90 days, for private profiles the grant cannot be extended and must be granted again.
-- Consequence for v1: the owner replaces `THREADS_ACCESS_TOKEN` (local `.env` and the GitHub secret) manually at least every 60 days (refresh by hand with the `curl` above, no more often than daily). A weekly run after expiry fails with an authentication error and exit 3.
+- Consequence for v1: the "Refresh token" workflow refreshes the Actions secret monthly, `./scripts/refresh-token.sh` refreshes the local `.env`, and an expired or unrefreshed token still makes the cleanup exit 3.
 - Source: long-lived-tokens and get-started pages (2026-10-23).
 
 ## Live observations
@@ -211,6 +213,7 @@ The original research (2026-10-23) used no credentials. Live checks on the owner
 
 ## Untested and pending
 
+- Whether the refresh endpoint returns a different token string, and whether the old token stays valid afterwards. Record as `[live]` after the first runs.
 - Which error code and HTTP status the 100-per-day deletion limit raises.
 - Ghost posts: whether `/me/threads` returns them (they have a separate `ghost_posts` edge not used here).
 - Any Meta platform-terms constraint on automated personal cleanup.
