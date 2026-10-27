@@ -11,6 +11,7 @@ Started: 2026-10-27T01:39:46.742Z
 - [x] P1-04 Setup guide and research notes for automatic refresh
 - [x] P1-05 README and .env.sample for token refresh
 - [x] P1-06 Phase 1 close — push and manual checks
+- [ ] R1-01 Refresh-script tests for duplicate lines, root writability, recovery text and Actions whitespace
 
 ## Log
 
