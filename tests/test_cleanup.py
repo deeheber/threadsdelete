@@ -96,7 +96,9 @@ class PreviewTests(unittest.TestCase):
         self.assertIn("repost: scanned=1 eligible=0 would_remove=0", text)
         self.assertNotIn("9000005", [line.split("  ")[2] for line in listed])
         self.assertIn("Discovery: complete", text)
-        self.assertIn("Quota: available (delete: 63 remaining, rolling 24 hours)", text)
+        self.assertIn("Quota at start: available (delete: 63 remaining, rolling 24 hours)", text)
+        lines = text.splitlines()
+        self.assertTrue(lines[lines.index("=== Summary ===") + 1].startswith("Quota at start:"))
         self.assertTrue(summary.discovery_complete)
 
     def test_preview_lists_eligible_repost(self) -> None:
@@ -282,7 +284,7 @@ class RemovalTests(unittest.TestCase):
         text, summary, _ = real_run(fake)
         assert summary is not None
         self.assertEqual(deletes(fake), ELIGIBLE_ORDER[:2])
-        self.assertIn("Quota: available (delete: 2 remaining", text)
+        self.assertIn("Quota at start: available (delete: 2 remaining", text)
         self.assertEqual(sum(v.deferred for v in summary.counts.values()), 3)
 
     def test_quota_unavailable_falls_back_to_cap_and_is_labelled(self) -> None:

@@ -211,6 +211,8 @@ The original research (2026-10-23) used no credentials. Live checks on the owner
 - `GET /me?fields=id,username` returned exactly `id` and `username`.
 - `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app, including text posts and reposts several years old. `GET /me/replies` returned replies created in the app, all with `is_reply_owned_by_me: true`.
 - 2026-10-27: a local `./scripts/refresh-token.sh` run on the owner's `.env` token returned a different token string. Right afterwards, `GET /me?fields=id` returned the owner's ID for both the old and the new token.
+- 2026-10-27: a manual "Refresh token" dispatch saved a new token to the `THREADS_ACCESS_TOKEN` secret with the `SECRETS_WRITE_TOKEN` PAT (Secrets: read and write only). The log showed no token. A following "Threads cleanup" preview authenticated with the new secret and completed discovery.
+- 2026-10-27: a removal run started with 95 deletions remaining and removed 6 posts, 12 replies and 6 reposts. Three minutes later `delete_quota_usage` was 29 (5 + 24): reposts counted against the quota, as in Reposts above.
 
 ## Untested and pending
 
