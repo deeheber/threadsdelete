@@ -9,7 +9,7 @@ Started: 2026-10-27T01:39:46.742Z
 - [x] P1-02 Actions destination for the refresh script
 - [x] P1-03 Monthly refresh workflow
 - [x] P1-04 Setup guide and research notes for automatic refresh
-- [ ] P1-05 README and .env.sample for token refresh
+- [x] P1-05 README and .env.sample for token refresh
 - [ ] P1-06 Phase 1 close — push and manual checks
 
 ## Log
@@ -31,3 +31,7 @@ Added .github/workflows/refresh-token.yml (exact content from task) and tests: R
 ### P1-04 — 170eb2e
 
 Rewrote META_SETUP section 8 ("Expiry and refresh"), intro line, README anchor, and RESEARCH edits (six items). Docs only. Note: the task's grep for the old anchor over docs/*.md still hits docs/PLAN.md (it quotes it); README and META_SETUP are clean. Manual check: NOT VERIFIED (human).
+
+### P1-05 — 2e248cf
+
+README: Token maintenance rewritten, three workflows, SECRETS_WRITE_TOKEN as numbered step 3 (steps renumbered), inactivity bullet extended. .env.sample: only the token comment changed. Docs only. Manual check: NOT VERIFIED (human).
