@@ -10,14 +10,21 @@
     "signing": "auto",
     "push": true,
     "pr": "draft",
-    "feedback": true
+    "feedback": true,
+    "archive": true,
+    "finalize": "ready",
+    "mergeMethod": "merge",
+    "syncBase": true
   },
-  "signing": null,
+  "signing": "on",
   "rounds": [],
   "archived": {
     "slug": "repost-removal",
     "dir": "docs/flights/repost-removal",
     "at": "2026-10-25T14:30:12.612Z"
   },
-  "breaking": true
+  "breaking": true,
+  "cleanroom": {
+    "mode": "general"
+  }
 }
