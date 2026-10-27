@@ -100,20 +100,21 @@ See [contributor commands](CLAUDE.md#commands) for checks and targeted tests. Te
 
 ## Scheduled cleanup with GitHub Actions
 
-Two workflows live in `.github/workflows/`: `ci.yml` (offline checks on push and pull request, no credentials) and `cleanup-feed.yml` (the cleanup).
+Three workflows live in `.github/workflows/`: `ci.yml` (offline checks on push and pull request, no credentials), `cleanup-feed.yml` (the cleanup) and `refresh-token.yml` (token refresh twice a month).
 
 1. In the repository go to Settings, Secrets and variables, Actions.
 2. **Secret**: `THREADS_ACCESS_TOKEN`.
-3. **Variables**: `THREADS_USER_ID`, and optionally `DRY_RUN`, `DAYS_AGO`, `MAX_DELETIONS_PER_RUN`. A missing Variable resolves to the default above. With `DRY_RUN` unset, scheduled runs are previews; set the Variable to `false` to enable real scheduled removal.
-4. Schedule: `cron: '0 5 * * 5'` (Fridays 05:00 UTC), edited directly in `cleanup-feed.yml`. The job's `timeout-minutes: 15` is an assumption you can change there too.
-5. Manual run: Actions tab, "Threads cleanup", Run workflow. The `dry_run` input defaults to `true` (forced preview); choose `variable` to follow the `DRY_RUN` Variable.
-6. Check results under Actions run history; each run writes a sanitized summary on the run page (the `=== Summary ===` block, or the last log lines on failure). Enable failure notifications in your GitHub notification settings for Actions.
+3. **Secret**: `SECRETS_WRITE_TOKEN`, a fine-grained personal access token for this repository only with the repository permission "Secrets: read and write", used by the "Refresh token" workflow to save the refreshed token (see [Meta setup](docs/META_SETUP.md#8-expiry-and-refresh)).
+4. **Variables**: `THREADS_USER_ID`, and optionally `DRY_RUN`, `DAYS_AGO`, `MAX_DELETIONS_PER_RUN`. A missing Variable resolves to the default above. With `DRY_RUN` unset, scheduled runs are previews; set the Variable to `false` to enable real scheduled removal.
+5. Schedule: `cron: '0 5 * * 5'` (Fridays 05:00 UTC), edited directly in `cleanup-feed.yml`. The job's `timeout-minutes: 15` is an assumption you can change there too.
+6. Manual run: Actions tab, "Threads cleanup", Run workflow. The `dry_run` input defaults to `true` (forced preview); choose `variable` to follow the `DRY_RUN` Variable.
+7. Check results under Actions run history; each run writes a sanitized summary on the run page (the `=== Summary ===` block, or the last log lines on failure). Enable failure notifications in your GitHub notification settings for Actions.
 
 Per [GitHub's schedule documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule):
 
 - Scheduled workflows only run from the default branch, so merge the workflow there.
 - Runs can be delayed at busy times.
-- In public repositories, scheduled workflows are disabled after 60 days without repository activity. Re-enable them or push occasionally.
+- In public repositories, scheduled workflows are disabled after 60 days without repository activity. The "Refresh token" schedule is disabled too, so the token can then expire. Re-enable both workflows or push occasionally.
 
 Runner minutes are billed under [GitHub's billing rules](https://docs.github.com/en/billing/concepts/product-billing/github-actions). A weekly run of a few minutes is normally within free allowances.
 
@@ -121,7 +122,7 @@ Runs are serialized (`concurrency: cleanup-feed`, `cancel-in-progress: false`). 
 
 ## Token maintenance
 
-Tokens expire after 60 days; the tool does not renew them. Follow [Meta setup](docs/META_SETUP.md#8-expiry-and-manual-renewal) to renew the token in both `.env` and the GitHub Secret, or [revoke access](docs/META_SETUP.md#9-revocation).
+Tokens expire after 60 days. The "Refresh token" workflow refreshes the Actions secret on the 1st and 15th of each month at 06:17 UTC, and `./scripts/refresh-token.sh` refreshes the local `.env` (it is live: it calls Meta and rewrites the token line of `.env`; it needs `curl` and `jq`). See [Meta setup](docs/META_SETUP.md#8-expiry-and-refresh), or [revoke access](docs/META_SETUP.md#9-revocation).
 
 ## Troubleshooting
 
