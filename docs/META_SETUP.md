@@ -1,6 +1,6 @@
 # Meta setup and token maintenance
 
-Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23). Automatic refresh (step 8) is not yet live-verified.
+Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23). In step 8, the local refresh (`./scripts/refresh-token.sh`) was live-verified on 2026-10-27; the automatic refresh in Actions is not yet live-verified.
 
 Commands use placeholders. Never put real IDs, secrets or tokens in docs, issues or commits. Sources and unknowns: [RESEARCH.md](RESEARCH.md).
 
