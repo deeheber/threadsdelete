@@ -10,7 +10,7 @@ Started: 2026-10-27T01:39:46.742Z
 - [x] P1-03 Monthly refresh workflow
 - [x] P1-04 Setup guide and research notes for automatic refresh
 - [x] P1-05 README and .env.sample for token refresh
-- [ ] P1-06 Phase 1 close — push and manual checks
+- [x] P1-06 Phase 1 close — push and manual checks
 
 ## Log
 
@@ -35,3 +35,17 @@ Rewrote META_SETUP section 8 ("Expiry and refresh"), intro line, README anchor, 
 ### P1-05 — 2e248cf
 
 README: Token maintenance rewritten, three workflows, SECRETS_WRITE_TOKEN as numbered step 3 (steps renumbered), inactivity bullet extended. .env.sample: only the token comment changed. Docs only. Manual check: NOT VERIFIED (human).
+
+### P1-06 — 472a80e
+
+Verify set green at 2e248cf (126 tests), compileall and bash -n ok, git diff --stat main -- threadsdelete main.py empty. Push: git push -u origin HEAD succeeded (build/2026-10-27). Empty commit made so the task commit subject exists.
+Owner, after merge, in order:
+(1) create the PAT, add the SECRETS_WRITE_TOKEN secret, and check that Actions failure notifications are on (docs/META_SETUP.md §8);
+(2) with the current token at least 24 hours old, run "Refresh token" by manual dispatch and check that the log shows the "saved to the repository secret" line and no token, and that gh secret list shows THREADS_ACCESS_TOKEN just updated;
+(3) run "Threads cleanup" by manual dispatch with dry_run true and check that authentication succeeds.
+Recommended:
+(4) if the local .env held the same token, run DRY_RUN=true ./scripts/run.sh before refreshing it locally;
+(5) if that worked, run ./scripts/refresh-token.sh locally and preview again; otherwise give local its own token (§5);
+(6) record in docs/RESEARCH.md as [live] whether the token string changed and the old token stayed valid, and update the shared-vs-separate guidance in docs/META_SETUP.md §8.
+Also confirm CI is green on the pull request.
+Manual check: NOT VERIFIED (human)
