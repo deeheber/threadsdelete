@@ -137,7 +137,7 @@ class SharedWorkflowTests(unittest.TestCase):
 
 class RefreshWorkflowTests(unittest.TestCase):
     def test_schedule_dispatch_permissions_concurrency_and_timeout(self) -> None:
-        self.assertIn("- cron: '0 6 1 * *'", REFRESH)
+        self.assertIn("- cron: '17 6 1,15 * *'", REFRESH)
         self.assertRegex(REFRESH, r"(?m)^  workflow_dispatch:\s*$")
         self.assertNotIn("inputs:", REFRESH)
         self.assertRegex(REFRESH, r"(?m)^permissions:\n  contents: read$")

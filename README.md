@@ -100,7 +100,7 @@ See [contributor commands](CLAUDE.md#commands) for checks and targeted tests. Te
 
 ## Scheduled cleanup with GitHub Actions
 
-Three workflows live in `.github/workflows/`: `ci.yml` (offline checks on push and pull request, no credentials), `cleanup-feed.yml` (the cleanup) and `refresh-token.yml` (monthly token refresh).
+Three workflows live in `.github/workflows/`: `ci.yml` (offline checks on push and pull request, no credentials), `cleanup-feed.yml` (the cleanup) and `refresh-token.yml` (token refresh twice a month).
 
 1. In the repository go to Settings, Secrets and variables, Actions.
 2. **Secret**: `THREADS_ACCESS_TOKEN`.
@@ -122,7 +122,7 @@ Runs are serialized (`concurrency: cleanup-feed`, `cancel-in-progress: false`). 
 
 ## Token maintenance
 
-Tokens expire after 60 days. The "Refresh token" workflow refreshes the Actions secret on the 1st of each month at 06:00 UTC, and `./scripts/refresh-token.sh` refreshes the local `.env` (it is live: it calls Meta and rewrites the token line of `.env`; it needs `curl` and `jq`). See [Meta setup](docs/META_SETUP.md#8-expiry-and-refresh), or [revoke access](docs/META_SETUP.md#9-revocation).
+Tokens expire after 60 days. The "Refresh token" workflow refreshes the Actions secret on the 1st and 15th of each month at 06:17 UTC, and `./scripts/refresh-token.sh` refreshes the local `.env` (it is live: it calls Meta and rewrites the token line of `.env`; it needs `curl` and `jq`). See [Meta setup](docs/META_SETUP.md#8-expiry-and-refresh), or [revoke access](docs/META_SETUP.md#9-revocation).
 
 ## Troubleshooting
 
