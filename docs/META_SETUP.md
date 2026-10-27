@@ -91,7 +91,7 @@ The tool compares this to `THREADS_USER_ID` on every run and refuses to continue
 - The first manual dispatch needs a current token at least 24 hours old. Check that it worked from the run log's "Token refreshed and saved to the repository secret" line and the update time of `THREADS_ACCESS_TOKEN` in `gh secret list`.
 - After a failure, read the script's message. If it says "Nothing was changed" (exit 2), the problem was found before the refresh request: fix the named cause, then run again. If it says the token's state "may have changed" (exit 1), it failed during or after the request: check the stored token with a cleanup preview (`DRY_RUN=true ./scripts/run.sh` locally, or the cleanup workflow with dry_run true). If that fails authentication, get a new token via step 5 and save it in the destination that failed (step 7); a new token cannot be refreshed until it is 24 hours old.
 - Local refresh: run `./scripts/refresh-token.sh`. It needs `curl` and `jq` and rewrites only the `THREADS_ACCESS_TOKEN=` line of the repository's `.env`. To refresh the repository secret, run the workflow instead.
-- Shared versus separate tokens: until rotation behavior is known (RESEARCH: Untested and pending), refresh a shared token in only one place, or give the local `.env` its own token by repeating step 5.
+- Shared versus separate tokens: a refresh returns a new token string, and the old one kept working right afterwards (RESEARCH: Live observations, 2026-10-27). How long it keeps working is untested, so refresh a shared token in only one place, or give the local `.env` its own token by repeating step 5.
 - Manual fallback:
 
 ```
