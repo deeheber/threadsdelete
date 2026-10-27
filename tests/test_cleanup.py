@@ -97,6 +97,8 @@ class PreviewTests(unittest.TestCase):
         self.assertNotIn("9000005", [line.split("  ")[2] for line in listed])
         self.assertIn("Discovery: complete", text)
         self.assertIn("Quota at start: available (delete: 63 remaining, rolling 24 hours)", text)
+        lines = text.splitlines()
+        self.assertTrue(lines[lines.index("=== Summary ===") + 1].startswith("Quota at start:"))
         self.assertTrue(summary.discovery_complete)
 
     def test_preview_lists_eligible_repost(self) -> None:

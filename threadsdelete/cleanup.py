@@ -97,7 +97,7 @@ def _candidate_line(label: str, candidate: Candidate) -> str:
 
 
 def _summary_lines(summary: RunSummary) -> list[str]:
-    lines = [SUMMARY_HEADER]
+    lines = []
     for category, counts in summary.counts.items():
         lines.append(
             f"{category}: scanned={counts.scanned} eligible={counts.eligible} "
@@ -108,13 +108,14 @@ def _summary_lines(summary: RunSummary) -> list[str]:
 
 
 def _print_report(summary: RunSummary, problem: str | None, quota_line: str, out: TextIO) -> None:
+    print(SUMMARY_HEADER, file=out)
+    print(quota_line, file=out)
     for line in _summary_lines(summary):
         print(line, file=out)
     if summary.discovery_complete:
         print("Discovery: complete", file=out)
     else:
         print(f"Discovery: INCOMPLETE \u2014 {problem} (no changes made)", file=out)
-    print(quota_line, file=out)
     for note in summary.notes:
         print(f"Note: {note}", file=out)
 
