@@ -57,7 +57,7 @@ Live commands (`./scripts/run.sh`, `uv run --env-file .env main.py`, `./scripts/
 
 ## Constraints
 
-Current rules: `constraints` in `docs/kukulu.json` during the token-refresh flight, archived afterwards to `docs/flights/token-refresh/kukulu.json`. The next flight's planner copies them from the newest archive to `docs/kukulu.json` for `kukulu_verify`:
+Current rules: `constraints` in `docs/flights/token-refresh/kukulu.json`. The next flight's planner copies them to `docs/kukulu.json` for `kukulu_verify`:
 
 - `no-hardcoded-assumption-defaults`: the ⚠️ ASSUMPTION defaults (`MAX_DELETIONS_PER_RUN`, `HTTP_TIMEOUT_SECONDS`, `MAX_READ_RETRIES`, `MAX_RETRY_WAIT_SECONDS`) are literals only in `threadsdelete/config.py`.
 - `core-is-pure`: `threadsdelete/core.py` imports no os/sys/time/socket/httpx/pathlib/io/logging, calls no `open(`, `sleep(`, `datetime.now(`.
@@ -96,43 +96,3 @@ Checks by reading (no line pattern catches these):
 - **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and matching README text; update `.env.sample` too when changing a user setting. Timeout and retry values are internal constants; live measurements are still pending.
 - **Pinned actions:** pin every `uses:` to a full 40-character commit SHA with the version in a trailing comment (`# v5.0.0`). Get it from `git ls-remote --tags https://github.com/<owner>/<repo>` (the peeled `^{}` SHA of the latest stable tag). Never guess a SHA.
 - **Kūkulu policies:** every flight sets `policies.archive` to `true` and `policies.finalize` to `"ready"` in `docs/kukulu.json`, unless that flight's spec says otherwise.
-
-## Flight token-refresh notes
-
-Builds `scripts/refresh-token.sh` and `.github/workflows/refresh-token.yml` (`docs/SPEC.md`, issue #5). In this flight's PLAN, `SPEC 4.1` (a bare number) means `docs/SPEC.md`; "original SPEC section N" means `docs/flights/threadsdelete/SPEC.md`. No change to `threadsdelete/` or `main.py`.
-
-### Task protocols
-
-**Live safety.** Never run `./scripts/refresh-token.sh`, `./scripts/run.sh`, `gh secret ...` or `gh workflow ...` from this checkout. Allowed: `bash -n scripts/refresh-token.sh` and the offline tests.
-
-**Refresh script contract** (P1-01, P1-02):
-- `mode` is set once: `if [ "${GITHUB_ACTIONS:-}" = "true" ]; then mode=actions; else mode=local; fi`.
-- Exit 2 for a step 1 or 2 failure (stderr ends `Nothing was changed. Fix the cause and run again.`). Exit 1 for a step 3 to 6 failure (stderr text contains `may have changed` and `docs/META_SETUP.md`). Exit 0 on success. Every error line starts `refresh-token: `.
-- curl, every call: `printf '%s' "$token" | curl -q --silent --show-error --max-time 30 --get --data-urlencode 'access_token@-' --output "$work/<name>.json" --write-out '%{http_code}' "$URL" 2>"$work/<name>.err"`. The URLs are `https://graph.threads.com/refresh_access_token?grant_type=th_refresh_token` and `https://graph.threads.com/v1.0/me?fields=id`. curl stderr and `gh` output are never printed.
-- `gh` argv is exactly `secret list`, or `secret set THREADS_ACCESS_TOKEN` with the token on stdin.
-- Exit codes: `rc=0; cmd || rc=$?`. The `trap cleanup EXIT` body uses only `if` blocks and ends `return 0` (a failing last trap command turns exit 0 into 1).
-- bash 3.2: no `mapfile`, `declare -A`, `${v,,}`, or empty `"${a[@]}"` under `set -u`.
-
-**Refresh test harness** (`tests/test_refresh_token.py`):
-- Copy the script to `<tmp>/scripts/`.
-- Fakes `curl`/`gh` live in `<tmp>/fakebin/`, with shebang `#!` + `sys.executable` and the record and response paths baked into their text. `jq` is symlinked there from `shutil.which("jq")`; if jq is missing, `self.fail(...)`, never skip.
-- `PATH=<tmp>/fakebin:/usr/bin:/bin`. The environment is built from scratch (`PATH`, `HOME`, `TMPDIR`, `XDG_CONFIG_HOME` under `<tmp>`, plus the case's inputs), never copied from `os.environ`.
-- Assert that `curl` and `gh` resolve to the fakes before each run, and never drop a fake from `PATH`.
-- Synthetic values only: tokens `FAKE-OLD-TOKEN-aaaa1111`/`FAKE-NEW-TOKEN-bbbb2222`, PAT `FAKE-PAT-cccc3333`, user `1000001`.
-
-**Executable bit.** `chmod +x scripts/refresh-token.sh` before `git add`; `git ls-files -s scripts/refresh-token.sh` must show `100755`.
-
-**Phase end.** Run the full verify set and the build command, then `git push -u origin HEAD`. Copy the task's manual-check text verbatim into the log, then add `Manual check: NOT VERIFIED (human)`. Fix nothing in this task: if a check fails, block with the failing command. A log-only task gets an empty commit whose subject is `<ID>: <title>` (`kukulu_task_done` needs that subject).
-
-### Commit template
-
-```
-<ID>: <title>
-
-Goal: <one sentence>
-Tests: <test names added or changed, or "none (docs)">
-Interpretation: <choices where SPEC or PLAN allowed two readings, or "none">
-Manual check: <what a human must check, or "none">
-```
-
-SPEC.md wins over PLAN.md, which wins over code comments.

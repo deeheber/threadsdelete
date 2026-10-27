@@ -82,12 +82,7 @@ fi
 
 # error_code FILE KEY: print a digits-only error code, or nothing.
 error_code() {
-  local v
-  v=$(jq -r "(if (.error|type)==\"object\" then .error.$2 else .$2 end) | if type==\"number\" and .==floor and .>=0 then tostring else empty end" "$1" 2>/dev/null || true)
-  case $v in
-    '' | *[!0-9]*) ;;
-    *) printf '%s' "$v" ;;
-  esac
+  jq -r "(if (.error|type)==\"object\" then .error.$2 else .$2 end) | tostring | select(test(\"^[0-9]+$\"))" "$1" 2>/dev/null || true
 }
 
 # Step 3: refresh, once, never retried.
@@ -124,10 +119,10 @@ if [ "$mode" = actions ]; then
   if [ "$rc" -ne 0 ]; then die_after "gh secret set failed (exit $rc); the PAT may lack Secrets: read and write."; fi
   printf 'Token refreshed and saved to the repository secret\n'
 else
-  env_tmp=$(mktemp .env.XXXXXX) || die_after "Saving to .env failed."
-  NEW_TOKEN="$new_token" awk '/^THREADS_ACCESS_TOKEN=/ { print "THREADS_ACCESS_TOKEN=" ENVIRON["NEW_TOKEN"]; next } { print }' .env >"$env_tmp" || die_after "Saving to .env failed."
-  chmod 600 "$env_tmp" || die_after "Saving to .env failed."
-  mv -f "$env_tmp" .env || die_after "Saving to .env failed."
+  { env_tmp=$(mktemp .env.XXXXXX) &&
+    NEW_TOKEN="$new_token" awk '/^THREADS_ACCESS_TOKEN=/ { print "THREADS_ACCESS_TOKEN=" ENVIRON["NEW_TOKEN"]; next } { print }' .env >"$env_tmp" &&
+    chmod 600 "$env_tmp" &&
+    mv -f "$env_tmp" .env; } || die_after "Saving to .env failed."
   env_tmp=""
   printf 'Token refreshed and saved to .env\n'
 fi

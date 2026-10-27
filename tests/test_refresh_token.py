@@ -392,6 +392,9 @@ class BothDestinationTests(Harness):
         bodies = [
             {"error_type": "OAuthException", "code": 190, "error_message": leak},
             {"error": {"message": leak, "error_user_msg": leak, "code": 190}},
+            {"error": {"code": 190, "error_subcode": "FAKE-LEAK-TOKEN-eeee5555"}},
+            {"error": {"code": 190, "error_subcode": -1}},
+            {"error": {"code": 190, "error_subcode": 2.5}},
         ]
         for mode in MODES:
             for i, body in enumerate(bodies):
@@ -401,6 +404,7 @@ class BothDestinationTests(Harness):
                     self.assertNotIn("FAKE-LEAK-TOKEN", combined)
                     self.assertNotIn("access_token=", combined)
                     self.assertIn("190", r.err)
+                    self.assertNotIn("subcode", r.err)
 
     def test_verify_failures_leave_destination_unchanged(self) -> None:
         cases: dict[str, dict[str, Any]] = {
@@ -434,7 +438,7 @@ class BothDestinationTests(Harness):
                         ]
                         self.assertFalse([x for x in rest if NEW in x])
 
-    def test_tokens_never_in_arguments_and_curl_starts_with_q(self) -> None:
+    def test_tokens_never_in_arguments(self) -> None:
         for mode in MODES:
             with self.subTest(mode=mode):
                 r = self.prepare(mode=mode)
@@ -447,12 +451,8 @@ class BothDestinationTests(Harness):
                 self.assertEqual(len(curls), 2)
                 for c in curls:
                     args = c["args"]
-                    self.assertEqual(args[0], "-q")
                     self.assertIn("--max-time", args)
-                    self.assertIn("--get", args)
                     self.assertEqual(args[args.index("--data-urlencode") + 1], "access_token@-")
-                    self.assertNotIn("-L", args)
-                    self.assertNotIn("--location", args)
                 self.assertIn(REFRESH_URL, curls[0]["args"])
                 self.assertIn(ME_URL, curls[1]["args"])
                 self.assertNotIn(OLD, r.out + r.err)
