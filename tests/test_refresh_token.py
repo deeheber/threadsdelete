@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -122,6 +123,7 @@ class Harness(unittest.TestCase):
         responses: dict[str, dict[str, Any]] | None = None,
         extra_env: dict[str, str | None] | None = None,
         env_mode: int = 0o644,
+        before_run: Callable[[], None] | None = None,
     ) -> Result:
         tmp = self.tmp
         for d in ("scripts", "home", "tmp", "xdg", "fakebin", "responses"):
@@ -183,6 +185,8 @@ class Harness(unittest.TestCase):
         self.assertEqual(shutil.which("gh", path=path_var), str(tmp / "fakebin" / "gh"))
         bash = shutil.which("bash", path=path_var)
         assert bash is not None
+        if before_run is not None:
+            before_run()
         proc = subprocess.run(
             [bash, str(script)],
             env=env,
@@ -202,6 +206,11 @@ class Harness(unittest.TestCase):
     def env_bytes(self) -> bytes | None:
         p = self.tmp / ".env"
         return p.read_bytes() if p.exists() else None
+
+    def assert_recovery_text(self, r: Result) -> None:
+        self.assertIn("docs/META_SETUP.md", r.err)
+        self.assertIn("cleanup preview", r.err)
+        self.assertNotIn("run again", r.err.lower())
 
     @staticmethod
     def mask_lines(r: Result) -> list[str]:
@@ -275,12 +284,14 @@ class LocalRefreshTests(Harness):
             "no env": None,
             "no token": uid,
             "two tokens": tok + tok + uid,
+            "two tokens, empty second": tok + "THREADS_ACCESS_TOKEN=\n" + uid,
             "empty token": "THREADS_ACCESS_TOKEN=\n" + uid,
             "space": "THREADS_ACCESS_TOKEN=FAKE OLD\n" + uid,
             "quoted": 'THREADS_ACCESS_TOKEN="FAKE-OLD-TOKEN-aaaa1111"\n' + uid,
             "cr": f"THREADS_ACCESS_TOKEN={OLD}\r\n" + uid,
             "no user": tok,
             "two users": tok + uid + uid,
+            "two users, empty second": tok + uid + "THREADS_USER_ID=\n",
             "empty user": tok + "THREADS_USER_ID=\n",
             "bad user": tok + "THREADS_USER_ID=12a4\n",
         }
@@ -293,7 +304,10 @@ class LocalRefreshTests(Harness):
                 self.assertEqual(r.calls, [])
                 self.assertEqual(self.env_bytes(), None if text is None else text.encode())
                 self.assertIn("Nothing was changed", r.err)
+                self.assertNotIn("may have changed", r.err)
                 self.assertNotIn(OLD, r.err)
+                if name.startswith("two "):
+                    self.assertIn("more than one", r.err)
 
     @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root ignores file modes")
     def test_unwritable_env_fails_before_network(self) -> None:
@@ -301,6 +315,19 @@ class LocalRefreshTests(Harness):
         self.assertEqual(r.code, 2, r.err)
         self.assertEqual(r.calls, [])
         self.assertEqual(self.env_bytes(), ENV_TEXT.encode())
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root ignores directory modes")
+    def test_unwritable_repository_root_fails_before_network(self) -> None:
+        def lock_root() -> None:
+            self.tmp.chmod(0o555)
+
+        # Registered last so it runs first, before TemporaryDirectory removal.
+        self.addCleanup(self.tmp.chmod, 0o755)
+        r = self.prepare(before_run=lock_root)
+        self.assertEqual(r.code, 2, r.err)
+        self.assertEqual(r.calls, [])
+        self.assertEqual(self.env_bytes(), ENV_TEXT.encode())
+        self.assertIn("Nothing was changed", r.err)
 
 
 class BothDestinationTests(Harness):
@@ -347,6 +374,7 @@ class BothDestinationTests(Harness):
                         )
                     self.assert_unchanged(mode, before, r)
                     self.assertIn("may have changed", r.err)
+                    self.assert_recovery_text(r)
                     self.assertNotIn("::add-mask::", r.out)
                     if name in ("oauth", "graph"):
                         self.assertIn("HTTP 400", r.err)
@@ -392,6 +420,7 @@ class BothDestinationTests(Harness):
                     self.assertEqual(len(r.curls()), 2)
                     self.assert_unchanged(mode, before, r)
                     self.assertIn("may have changed", r.err)
+                    self.assert_recovery_text(r)
                     if name in ("other id", "no id", "numeric id"):
                         self.assertIn("differs", r.err)
                         self.assertNotIn("2000002", r.err)
@@ -466,6 +495,8 @@ class ActionsRefreshTests(Harness):
         names = ("THREADS_ACCESS_TOKEN", "THREADS_USER_ID", "GH_TOKEN", "GH_REPO")
         cases: list[tuple[str, str | None]] = [(n, v) for n in names for v in (None, "")]
         cases.append(("THREADS_USER_ID", "12a4"))
+        cases.append(("THREADS_ACCESS_TOKEN", "FAKE OLD"))
+        cases.append(("THREADS_ACCESS_TOKEN", "FAKE-OLD\r"))
         for name, value in cases:
             with self.subTest(name=name, value=value):
                 r = self.prepare(mode="actions", extra_env={name: value})
