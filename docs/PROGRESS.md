@@ -11,7 +11,7 @@ Started: 2026-10-27T01:39:46.742Z
 - [x] P1-04 Setup guide and research notes for automatic refresh
 - [x] P1-05 README and .env.sample for token refresh
 - [x] P1-06 Phase 1 close — push and manual checks
-- [ ] R1-01 Refresh-script tests for duplicate lines, root writability, recovery text and Actions whitespace
+- [x] R1-01 Refresh-script tests for duplicate lines, root writability, recovery text and Actions whitespace
 
 ## Log
 
@@ -50,3 +50,9 @@ Recommended:
 (6) record in docs/RESEARCH.md as [live] whether the token string changed and the old token stayed valid, and update the shared-vs-separate guidance in docs/META_SETUP.md §8.
 Also confirm CI is green on the pull request.
 Manual check: NOT VERIFIED (human)
+
+### R1-01 — 3d737ec
+
+Tests only in tests/test_refresh_token.py: duplicate token/user lines (incl. empty second value) assert 'more than one' and no 'may have changed'; new test_unwritable_repository_root_fails_before_network (skips as root; Harness.prepare gained optional before_run hook to chmod root 0o555 after files are written; cleanup restores 0o755 first); recovery text asserts docs/META_SETUP.md, 'cleanup preview', no 'run again'; Actions token 'FAKE OLD' and 'FAKE-OLD\r' cases.
+Mutants (a)-(d) re-run manually via sed on the script (kukulu_mutate not available): all four make tests.test_refresh_token fail; script restored.
+kukulu_verify: all green after ruff format.
