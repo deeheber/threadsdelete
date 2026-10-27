@@ -1,56 +1,51 @@
 # Review: token-refresh flight
-Round: 1
+Round: 2
 
-Branch `build/2026-10-27`, base `main` (a5ac889), head 5668744. Tasks: 6 done, 0 blocked, 0 skipped.
+Branch `build/2026-10-27`, base `main` (a5ac889), head 9536616. Tasks: 7 done (P1-01 to P1-06, R1-01), 0 blocked, 0 skipped.
 
 ## Verdict
 
-CHANGES REQUESTED
+APPROVED
 
-The script, workflow and docs match SPEC 4.1, 4.2 and 6. `kukulu_verify` passes: all 29 constraint rules are green with no fixture failures, along with lockfile, mypy, ruff lint and format, 126 offline tests, `--help`, and `bash -n` on both scripts. PR checks: `pass`. Clean-room: `kukulu_status` returned `cleanroom: null`, so there was nothing to audit. The remaining problem is in category 3: four mutants of `scripts/refresh-token.sh` survive the suite, and three of them leave SPEC requirements untested.
+Round 1 reviewed the whole branch (P1-01 to P1-06). Its one finding was four surviving mutants in `scripts/refresh-token.sh`, queued as R1-01. Since `lastReviewCommit` 905374d, the only code change is `tests/test_refresh_token.py` (commit 3d737ec, signed). The rest is pipeline bookkeeping: `.kukulu/state.json`, `docs/HANDOFF.md` and `docs/PROGRESS.md`. `scripts/refresh-token.sh`, the workflows, docs, `threadsdelete/` and `main.py` have not changed since round 1.
+
+- **PR checks:** `kukulu_status` reports `prChecks.state: pass`, with no failing checks.
+- **Clean-room:** `kukulu_status` returned `cleanroom: null`, so there were no denials to audit.
+- **`kukulu_verify`:** everything passes. That covers all 29 constraint rules (no fixture failures, no hits), `uv lock --check`, mypy, ruff check, ruff format (40 files), 127 offline tests (126 before, plus the new root-writability test), `main.py --help`, `bash -n scripts/run.sh` and `bash -n scripts/refresh-token.sh`.
 
 ## Findings
 
-### 1. Category 3 (tests): four surviving mutants in `scripts/refresh-token.sh` (fixed in R1-01)
+None.
 
-Each mutant was run with `kukulu_mutate` (targeted `unit`, filter `tests.test_refresh_token`). The script is correct in every case. The tests just don't check these mechanics.
+R1-01 was checked against its PLAN acceptance tests and verification steps:
 
-1. **Duplicate-line check** (`scripts/refresh-token.sh:47`, `if [ "$n" -gt 1 ]; then die_before ".env has more than one $key line."; fi`). Deleting it **survives**. The "two tokens" and "two users" cases in `test_invalid_env_file_fails_before_network` (`tests/test_refresh_token.py:277`, `:283`) still exit 2, but for a different reason: `sed -n 's/^KEY=//p'` returns `OLD\nOLD`, and the whitespace check or the digits-only check rejects that embedded newline. A duplicate whose second value is empty (`THREADS_ACCESS_TOKEN=OLD\nTHREADS_ACCESS_TOKEN=\n`) gives `OLD` once command substitution strips the trailing newline (checked in a scratch shell). Without the check, the script would send a refresh request and awk would then write the new token into both lines. This breaks SPEC 4.1 step 1 ("exactly one `THREADS_ACCESS_TOKEN=` line and exactly one `THREADS_USER_ID=` line") and SPEC 5 Local ("a ... duplicated ... line ... fails before any `curl` call").
-2. **Repository-root writability** (`scripts/refresh-token.sh:80`, `[ -w . ] || die_before "the repository root is not writable."`). Deleting it **survives**. No test makes the root unwritable. This breaks SPEC 4.1 step 2 ("Local: `.env` and the repository root are writable").
-3. **Recovery text after a refresh** (`scripts/refresh-token.sh:27`). Replacing "Check the stored token with a cleanup preview ... replace it by hand (docs/META_SETUP.md sections 5 and 8)." with "Run again." **survives**. Tests assert only `may have changed`. This breaks SPEC 4.1 Failure messages (check the stored token with a cleanup preview, replace by hand via `docs/META_SETUP.md` §5 and §8; never promise that running again fixes it). PLAN Decisions also says "Tests assert `Nothing was changed`, `may have changed` and `docs/META_SETUP.md`", and no test asserts `docs/META_SETUP.md`. The mutant swaps in exactly the promise SPEC forbids, and nothing notices.
-4. **Actions whitespace check** (`scripts/refresh-token.sh:40`, `*[[:space:]]*) die_before "THREADS_ACCESS_TOKEN must not contain whitespace."`). Turning it into a never-matching pattern **survives**. `test_missing_input_fails_before_any_call` never passes a token containing whitespace. This is a PLAN P1-02 step 1 rule. It exists so a bad secret fails at exit 2 before a refresh request is wasted.
-
-Controls that were **killed** (failures confirmed with `confirmKill`): removing the `::add-mask::` line (caught by the Actions verify-failure and success tests), reading `.error.code` as top-level `.code` (caught by the Graph-shape `190`/`460` assertions), and switching `cancel-in-progress: false` to `true` in `.github/workflows/refresh-token.yml` (caught by `RefreshWorkflowTests`).
-
-**What would break:** if any of these four mechanics regressed, a future round would still pass. Without mechanic 1, a duplicated `.env` line goes to Meta and gets rewritten twice. Without mechanic 3, the owner would be told to rerun after a refresh that may already have rotated the token.
-
-**Minimal fix (tests only, `tests/test_refresh_token.py`):**
-- In `test_invalid_env_file_fails_before_network`, assert `more than one` in stderr for the "two tokens" and "two users" cases. Add the cases `tok + "THREADS_ACCESS_TOKEN=\n" + uid` and `tok + uid + "THREADS_USER_ID=\n"`, each expecting exit 2, no records, the file unchanged, and `more than one` in stderr.
-- Add a local test that makes `<tmp>` mode `0o555` after `prepare` writes the files. Register `addCleanup` to set `0o755` back first, so `TemporaryDirectory` cleanup works. Expect exit 2, no curl record, `.env` unchanged and `Nothing was changed`. Use the same `geteuid() == 0` skip. The harness must create `.env` before the chmod. Records go to `<tmp>/calls.jsonl`, so the test should prepare that file, or check that no record exists afterwards, while the root is read-only.
-- In `test_refresh_failures_stop_before_any_other_call` and `test_verify_failures_leave_destination_unchanged`, assert that stderr contains `docs/META_SETUP.md` and `cleanup preview`, and does not contain `run again` (case-insensitive). `Nothing was changed. Fix the cause and run again.` is the exit-2 wording. In `test_invalid_env_file_fails_before_network`, also assert that stderr does not contain `may have changed`.
-- In `test_missing_input_fails_before_any_call`, add `THREADS_ACCESS_TOKEN` values `FAKE OLD` and `FAKE-OLD\r`, each expecting exit 2, no records, and `THREADS_ACCESS_TOKEN` in stderr.
-
-Task: R1-01.
+1. Category 3 (tests). I re-ran all four of the task's mutants myself with `kukulu_mutate` (file `scripts/refresh-token.sh`, targeted `unit`, filter `tests.test_refresh_token`, `confirmKill: true`). All four are now **killed**. In each case the failure tail names the test the task intended, and the unmutated re-run passes (16 tests OK).
+   - (a) Deleting the duplicate-line check fails `test_invalid_env_file_fails_before_network` in all four duplicate cases. "two tokens, empty second" and "two users, empty second" exit 0 instead of 2. This is the shape that the whitespace and digits checks cannot catch.
+   - (b) Deleting the `[ -w . ]` check fails `test_unwritable_repository_root_fails_before_network` with exit 1 instead of 2. The fake `curl` cannot create `calls.jsonl` under the read-only root, so the run fails rather than passing, which is what the task asked for.
+   - (c) Replacing the recovery text with "Run again." fails `assert_recovery_text` in 30 subtests across `test_refresh_failures_stop_before_any_other_call` and `test_verify_failures_leave_destination_unchanged`.
+   - (d) Making the Actions whitespace pattern never match fails `test_missing_input_fails_before_any_call` for `FAKE OLD` and `FAKE-OLD\r` (exit 0 instead of 2).
+2. Category 2 (boundaries). The fix is limited to the task's one file. It imports only the stdlib (`collections.abc.Callable`). The `before_run` hook runs after the harness has checked that the fakes are first on PATH, so the SPEC 5 isolation rules hold. The new test skips only when `geteuid() == 0`. It registers `chmod 0o755` through `addCleanup` after the temporary directory's own cleanup, so it runs first and removal still works.
+3. Category 1 (constraints). Nothing in the diff touches any rule in CLAUDE.md § Constraints, and the reading-only checks are unaffected. The fixtures stay synthetic (`FAKE-OLD…`, fake IDs).
 
 ## Spec issues
 
-- PLAN P1-04's verification grep (`grep -rn "8-expiry-and-manual-renewal" README.md docs/*.md`) can never print nothing, because `docs/PLAN.md` quotes the old anchor. The implementer was right to leave PLAN.md alone. The planner should exclude PLAN.md in future greps of this kind.
-- `curl-q-first` over-matches `(curl` and `then curl` inside message strings (HANDOFF codebase note). This is a false positive, not a blind spot. It made the implementer reword messages ("failed, curl exit N."), which is harmless.
+Carried from round 1. Neither one blocks approval.
+
+- PLAN P1-04's verification grep (`grep -rn "8-expiry-and-manual-renewal" README.md docs/*.md`) can never come back empty, because `docs/PLAN.md` quotes the old anchor. Future planners should exclude PLAN.md from greps like this.
+- `curl-q-first` over-matches `(curl` and `then curl` inside message strings. That is a false positive, not a blind spot. Its only effect was the harmless "failed, curl exit N." wording.
 
 ## Manual checks still owed
 
 Copied from HANDOFF.md:
 
-1. Create the PAT, add `SECRETS_WRITE_TOKEN`, enable Actions failure notifications (docs/META_SETUP.md section 8).
-2. With a token at least 24 hours old, dispatch "Refresh token"; check the "saved to the repository secret" line, no token in the log, and `gh secret list` update time.
-3. Dispatch "Threads cleanup" with dry_run true; check authentication succeeds.
-4. Recommended: preview locally, then run `./scripts/refresh-token.sh`; record in docs/RESEARCH.md as [live] whether the token string changed and the old token stayed valid.
-5. Confirm CI is green on the pull request. (At this review, `prChecks` reports `pass`.)
+1. Create the PAT, add `SECRETS_WRITE_TOKEN`, and enable Actions failure notifications (docs/META_SETUP.md section 8).
+2. With a token at least 24 hours old, dispatch "Refresh token". Check for the "saved to the repository secret" line, check that no token appears in the log, and check the update time in `gh secret list`.
+3. Dispatch "Threads cleanup" with dry_run true and check that authentication succeeds.
+4. Recommended: preview locally, then run `./scripts/refresh-token.sh`. Record in docs/RESEARCH.md as [live] whether the token string changed and whether the old token stayed valid.
+5. Confirm CI is green on the pull request. At this review, `prChecks` reports `pass`.
 
 ## Notes
 
-- Interpretation choices in HANDOFF.md. The P1-01 "curl exit N" wording, P1-02's `eval` on four fixed key names (no user input reaches `eval`; the value is assigned, not expanded into an argument), P1-04 leaving PLAN.md alone, P1-05's numbered `SECRETS_WRITE_TOKEN` step, and P1-06's empty commit each match the reading of SPEC most consistent with the rest of it. None is a finding.
-- `git check-ignore -v .env.abc123` gives `.gitignore:8:.env.*`, so the local temp file `.env.XXXXXX` is ignored, as SPEC 4.1 step 6 assumes. `.gitignore`, `.gitattributes`, `ci.yml`, `cleanup-feed.yml`, `scripts/run.sh`, `threadsdelete/` and `main.py` are unchanged against `main`. Only `.env.sample` is tracked.
-- An unreadable `.env` (for example mode `000`) passes `[ -f .env ]`. `grep -c` then fails, the `-eq`/`-gt` tests print "integer expression expected", and `sed` fails under `set -e`. The script exits non-zero (1 with BSD sed) before any network call, without the `refresh-token:` prefix or "Nothing was changed". SPEC does not require a readability check, so this is advisory only.
-- `chmod 600 "$env_tmp"` and `umask 077` overlap, because `mktemp` already creates files with mode 600. Mutating either one alone is equivalent, so neither counts as a test gap.
-- `test_success_sets_secret_from_stdin` compares `gh` args with `[:3]`, so a trailing extra flag would not fail that test. `no-secret-body-flag` and the no-token-in-arguments test cover the dangerous case (`--body`/`-b`).
+- In `test_unwritable_repository_root_fails_before_network`, the `r.calls == []` assertion cannot see a `curl` call while the root is read-only, because the fake cannot record it. The exit-code assertion carries the test, and mutant (b) confirms it does. This is advisory only.
+- HANDOFF says `kukulu_mutate` was unavailable to the implementer, so the mutants were re-run by hand with `sed` and restored with `git checkout`. Running them through the tool here confirms the results, and the tree is clean.
+- Round 1's advisory notes still apply and are unchanged: an unreadable `.env` exits non-zero without the `refresh-token:` prefix; `chmod 600` and `umask 077` overlap; `gh` args are compared with `[:3]`.
