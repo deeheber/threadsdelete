@@ -29,3 +29,11 @@ None.
 
 ## For the reviewer
 No changes under `threadsdelete/` or `main.py`. The script was never run live.
+
+## Round 1
+
+- Branch build/2026-10-27, head after R1-01 fix commit 3d737ec; tasks 7 done, 0 blocked, 0 skipped.
+- R1-01 (tests only, tests/test_refresh_token.py): kills four surviving mutants of scripts/refresh-token.sh (duplicate .env lines, unwritable repo root, recovery text, Actions token whitespace). The script is unchanged.
+- Interpretation: `Harness.prepare` gained an optional `before_run` hook so the root can be locked read-only after files are written. The root-lock test skips only when running as root.
+- `kukulu_mutate` was not available; I re-ran mutants (a)-(d) by hand with sed on the script, and each failed `tests.test_refresh_token`. The script was restored with git checkout.
+- Final `kukulu_verify` green (constraints, mypy, ruff, 127 tests).
