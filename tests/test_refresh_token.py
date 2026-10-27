@@ -15,7 +15,9 @@ import tests  # noqa: F401
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "refresh-token.sh"
-MODES = ("local",)
+MODES = ("local", "actions")
+PAT = "FAKE-PAT-cccc3333"
+UNSET: Any = object()
 
 OLD = "FAKE-OLD-TOKEN-aaaa1111"
 NEW = "FAKE-NEW-TOKEN-bbbb2222"
@@ -116,9 +118,9 @@ class Harness(unittest.TestCase):
     def prepare(
         self,
         mode: str = "local",
-        env_text: str | None = ENV_TEXT,
+        env_text: Any = UNSET,
         responses: dict[str, dict[str, Any]] | None = None,
-        extra_env: dict[str, str] | None = None,
+        extra_env: dict[str, str | None] | None = None,
         env_mode: int = 0o644,
     ) -> Result:
         tmp = self.tmp
@@ -146,6 +148,12 @@ class Harness(unittest.TestCase):
         for name, value in merged.items():
             (tmp / "responses" / f"{name}.json").write_text(json.dumps(value))
         env_file = tmp / ".env"
+        if env_text is UNSET:
+            env_text = ENV_TEXT if mode == "local" else None
+        if env_file.exists():
+            env_file.unlink()
+        for leftover in tmp.glob(".env.*"):
+            leftover.unlink()
         if env_text is not None:
             env_file.write_text(env_text)
             env_file.chmod(env_mode)
@@ -157,8 +165,20 @@ class Harness(unittest.TestCase):
             "XDG_CONFIG_HOME": str(tmp / "xdg"),
         }
         if mode == "actions":
-            env["GITHUB_ACTIONS"] = "true"
-        env.update(extra_env or {})
+            env.update(
+                {
+                    "GITHUB_ACTIONS": "true",
+                    "THREADS_ACCESS_TOKEN": OLD,
+                    "THREADS_USER_ID": "1000001",
+                    "GH_TOKEN": PAT,
+                    "GH_REPO": "example-owner/threadsdelete",
+                }
+            )
+        for k, v in (extra_env or {}).items():
+            if v is None:
+                env.pop(k, None)
+            else:
+                env[k] = v
         self.assertEqual(shutil.which("curl", path=path_var), str(tmp / "fakebin" / "curl"))
         self.assertEqual(shutil.which("gh", path=path_var), str(tmp / "fakebin" / "gh"))
         bash = shutil.which("bash", path=path_var)
@@ -183,13 +203,20 @@ class Harness(unittest.TestCase):
         p = self.tmp / ".env"
         return p.read_bytes() if p.exists() else None
 
+    @staticmethod
+    def mask_lines(r: Result) -> list[str]:
+        return [x for x in r.out.splitlines() if x.startswith("::add-mask::")]
+
     def assert_no_env_temp(self) -> None:
         self.assertEqual(list(self.tmp.glob(".env.*")), [])
 
-    def assert_unchanged(self, mode: str, before: bytes | None) -> None:
+    def assert_unchanged(self, mode: str, before: bytes | None, r: Result) -> None:
         if mode == "local":
             self.assertEqual(self.env_bytes(), before)
             self.assert_no_env_temp()
+        else:
+            self.assertEqual([c for c in r.calls if c["args"][:2] == ["secret", "set"]], [])
+            self.assertIsNone(self.env_bytes())
 
 
 class ScriptFileTests(unittest.TestCase):
@@ -313,8 +340,12 @@ class BothDestinationTests(Harness):
                     r = self.prepare(mode=mode, responses={"refresh": response})
                     self.assertEqual(r.code, 1, r.err)
                     self.assertEqual([c["endpoint"] for c in r.curls()], ["refresh"])
-                    self.assertEqual(len(r.calls), 1)
-                    self.assert_unchanged(mode, before)
+                    self.assertEqual(len([c for c in r.calls if c["tool"] == "curl"]), 1)
+                    if mode == "actions":
+                        self.assertEqual(
+                            [c["args"] for c in r.calls if c["tool"] == "gh"], [["secret", "list"]]
+                        )
+                    self.assert_unchanged(mode, before, r)
                     self.assertIn("may have changed", r.err)
                     self.assertNotIn("::add-mask::", r.out)
                     if name in ("oauth", "graph"):
@@ -359,7 +390,7 @@ class BothDestinationTests(Harness):
                     r = self.prepare(mode=mode, responses={"me": response})
                     self.assertEqual(r.code, 1, r.err)
                     self.assertEqual(len(r.curls()), 2)
-                    self.assert_unchanged(mode, before)
+                    self.assert_unchanged(mode, before, r)
                     self.assertIn("may have changed", r.err)
                     if name in ("other id", "no id", "numeric id"):
                         self.assertIn("differs", r.err)
@@ -367,6 +398,12 @@ class BothDestinationTests(Harness):
                         self.assertNotIn("1000001", r.err)
                     if mode == "local":
                         self.assertNotIn(NEW, r.out + r.err)
+                    else:
+                        self.assertEqual(self.mask_lines(r), [f"::add-mask::{NEW}"])
+                        rest = [
+                            x for x in (r.out + r.err).splitlines() if x != f"::add-mask::{NEW}"
+                        ]
+                        self.assertFalse([x for x in rest if NEW in x])
 
     def test_tokens_never_in_arguments_and_curl_starts_with_q(self) -> None:
         for mode in MODES:
@@ -375,8 +412,8 @@ class BothDestinationTests(Harness):
                 self.assertEqual(r.code, 0, r.err)
                 for call in r.calls:
                     for arg in call["args"]:
-                        self.assertNotIn(OLD, arg)
-                        self.assertNotIn(NEW, arg)
+                        for secret in (OLD, NEW, PAT):
+                            self.assertNotIn(secret, arg)
                 curls = r.curls()
                 self.assertEqual(len(curls), 2)
                 for c in curls:
@@ -390,6 +427,66 @@ class BothDestinationTests(Harness):
                 self.assertIn(REFRESH_URL, curls[0]["args"])
                 self.assertIn(ME_URL, curls[1]["args"])
                 self.assertNotIn(OLD, r.out + r.err)
+
+
+class ActionsRefreshTests(Harness):
+    def test_success_sets_secret_from_stdin(self) -> None:
+        r = self.prepare(mode="actions")
+        self.assertEqual(r.code, 0, r.err)
+        shape = [
+            (c["tool"], c["args"][:3] if c["tool"] == "gh" else c["endpoint"], c["stdin"])
+            for c in r.calls
+        ]
+        self.assertEqual(
+            shape,
+            [
+                ("gh", ["secret", "list"], ""),
+                ("curl", "refresh", OLD),
+                ("curl", "me", NEW),
+                ("gh", ["secret", "set", "THREADS_ACCESS_TOKEN"], NEW),
+            ],
+        )
+        self.assertIn("Token refreshed and saved to the repository secret", r.out)
+        lines = [x for x in (r.out + r.err).splitlines() if NEW in x]
+        self.assertEqual(lines, [f"::add-mask::{NEW}"])
+        for secret in (OLD, PAT):
+            self.assertNotIn(secret, r.out + r.err)
+        self.assertIsNone(self.env_bytes())
+        self.assertEqual(list((self.tmp / "tmp").iterdir()), [])
+
+    def test_env_file_is_ignored_in_actions(self) -> None:
+        text = "THREADS_ACCESS_TOKEN=FAKE-ENV-TOKEN-dddd4444\nTHREADS_USER_ID=1000001\n"
+        r = self.prepare(mode="actions", env_text=text)
+        self.assertEqual(r.code, 0, r.err)
+        self.assertEqual(r.curls()[0]["stdin"], OLD)
+        self.assertEqual(self.env_bytes(), text.encode())
+        self.assertNotIn("FAKE-ENV-TOKEN-dddd4444", json.dumps(r.calls))
+
+    def test_missing_input_fails_before_any_call(self) -> None:
+        names = ("THREADS_ACCESS_TOKEN", "THREADS_USER_ID", "GH_TOKEN", "GH_REPO")
+        cases: list[tuple[str, str | None]] = [(n, v) for n in names for v in (None, "")]
+        cases.append(("THREADS_USER_ID", "12a4"))
+        for name, value in cases:
+            with self.subTest(name=name, value=value):
+                r = self.prepare(mode="actions", extra_env={name: value})
+                self.assertEqual(r.code, 2, r.err)
+                self.assertEqual(r.calls, [])
+                self.assertIn("Nothing was changed", r.err)
+                self.assertIn(name, r.err)
+
+    def test_failed_secret_list_stops_before_refresh(self) -> None:
+        r = self.prepare(mode="actions", responses={"gh": {"list_exit": 1}})
+        self.assertEqual(r.code, 2, r.err)
+        self.assertEqual([c["args"] for c in r.calls], [["secret", "list"]])
+        self.assertIn("Nothing was changed", r.err)
+
+    def test_failed_secret_set_exits_non_zero(self) -> None:
+        r = self.prepare(mode="actions", responses={"gh": {"set_exit": 1}})
+        self.assertEqual(r.code, 1, r.err)
+        self.assertIn("may have changed", r.err)
+        self.assertIn("gh secret set failed", r.err)
+        lines = [x for x in (r.out + r.err).splitlines() if NEW in x]
+        self.assertEqual(lines, [f"::add-mask::{NEW}"])
 
 
 if __name__ == "__main__":

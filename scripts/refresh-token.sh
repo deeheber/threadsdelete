@@ -30,35 +30,55 @@ die_after() {
 
 # Step 1: validate inputs.
 if [ "$mode" = actions ]; then
-  die_before "GitHub Actions mode is not available yet."
+  for key in THREADS_ACCESS_TOKEN THREADS_USER_ID GH_TOKEN GH_REPO; do
+    eval "val=\${$key:-}"
+    if [ -z "$val" ]; then die_before "$key is not set."; fi
+  done
+  old_token=$THREADS_ACCESS_TOKEN
+  user_id=$THREADS_USER_ID
+  case $old_token in
+    *[[:space:]]*) die_before "THREADS_ACCESS_TOKEN must not contain whitespace." ;;
+  esac
+else
+  [ -f .env ] || die_before ".env not found in the repository root."
+  for key in THREADS_ACCESS_TOKEN THREADS_USER_ID; do
+    n=$(grep -c "^${key}=" .env || true)
+    if [ "$n" -eq 0 ]; then die_before "$key is missing from .env."; fi
+    if [ "$n" -gt 1 ]; then die_before ".env has more than one $key line."; fi
+    val=$(sed -n "s/^${key}=//p" .env)
+    if [ -z "$val" ]; then die_before "$key is empty in .env."; fi
+    if [ "$key" = THREADS_ACCESS_TOKEN ]; then
+      old_token=$val
+    else
+      user_id=$val
+    fi
+  done
+  case $old_token in
+    *[[:space:]\"\']*) die_before "THREADS_ACCESS_TOKEN must be one unquoted value with no spaces." ;;
+  esac
 fi
-[ -f .env ] || die_before ".env not found in the repository root."
-for key in THREADS_ACCESS_TOKEN THREADS_USER_ID; do
-  n=$(grep -c "^${key}=" .env || true)
-  if [ "$n" -eq 0 ]; then die_before "$key is missing from .env."; fi
-  if [ "$n" -gt 1 ]; then die_before ".env has more than one $key line."; fi
-  val=$(sed -n "s/^${key}=//p" .env)
-  if [ -z "$val" ]; then die_before "$key is empty in .env."; fi
-  if [ "$key" = THREADS_ACCESS_TOKEN ]; then
-    old_token=$val
-  else
-    user_id=$val
-  fi
-done
-case $old_token in
-  *[[:space:]\"\']*) die_before "THREADS_ACCESS_TOKEN must be one unquoted value with no spaces." ;;
-esac
 case $user_id in
   '' | *[!0-9]*) die_before "THREADS_USER_ID must be digits only." ;;
 esac
 command -v curl >/dev/null 2>&1 || die_before "curl is not on PATH."
 command -v jq >/dev/null 2>&1 || die_before "jq is not on PATH."
+if [ "$mode" = actions ]; then
+  command -v gh >/dev/null 2>&1 || die_before "gh is not on PATH."
+fi
 
 work=$(mktemp -d)
 
 # Step 2: destination writable.
-[ -w .env ] || die_before ".env is not writable."
-[ -w . ] || die_before "the repository root is not writable."
+if [ "$mode" = actions ]; then
+  rc=0
+  gh secret list >"$work/gh-list.out" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    die_before "gh secret list failed (exit $rc). Check that the SECRETS_WRITE_TOKEN secret holds an unexpired fine-grained PAT for this repository with Secrets: read and write."
+  fi
+else
+  [ -w .env ] || die_before ".env is not writable."
+  [ -w . ] || die_before "the repository root is not writable."
+fi
 
 # error_code FILE KEY: print a digits-only error code, or nothing.
 error_code() {
@@ -97,12 +117,17 @@ if [ "$status" != "200" ]; then die_after "Verify failed: HTTP $status."; fi
 jq -e 'type=="object"' "$work/me.json" >/dev/null 2>&1 || die_after "Verify failed: the response was not a JSON object."
 jq -e --arg id "$user_id" '(.id|type)=="string" and .id == $id' "$work/me.json" >/dev/null 2>&1 || die_after "Verify failed: the new token's account ID differs from THREADS_USER_ID."
 
-# Step 6: save to .env.
-env_tmp=$(mktemp .env.XXXXXX) || die_after "Saving to .env failed."
-NEW_TOKEN="$new_token" awk '/^THREADS_ACCESS_TOKEN=/ { print "THREADS_ACCESS_TOKEN=" ENVIRON["NEW_TOKEN"]; next } { print }' .env >"$env_tmp" || die_after "Saving to .env failed."
-chmod 600 "$env_tmp" || die_after "Saving to .env failed."
-mv -f "$env_tmp" .env || die_after "Saving to .env failed."
-env_tmp=""
-
-# Step 7.
-printf 'Token refreshed and saved to .env\n'
+# Step 6: save.
+if [ "$mode" = actions ]; then
+  rc=0
+  printf '%s' "$new_token" | gh secret set THREADS_ACCESS_TOKEN >"$work/gh-set.out" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then die_after "gh secret set failed (exit $rc); the PAT may lack Secrets: read and write."; fi
+  printf 'Token refreshed and saved to the repository secret\n'
+else
+  env_tmp=$(mktemp .env.XXXXXX) || die_after "Saving to .env failed."
+  NEW_TOKEN="$new_token" awk '/^THREADS_ACCESS_TOKEN=/ { print "THREADS_ACCESS_TOKEN=" ENVIRON["NEW_TOKEN"]; next } { print }' .env >"$env_tmp" || die_after "Saving to .env failed."
+  chmod 600 "$env_tmp" || die_after "Saving to .env failed."
+  mv -f "$env_tmp" .env || die_after "Saving to .env failed."
+  env_tmp=""
+  printf 'Token refreshed and saved to .env\n'
+fi
