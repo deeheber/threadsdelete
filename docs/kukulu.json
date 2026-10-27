@@ -1,0 +1,621 @@
+{
+  "verify": [
+    "uv lock --check",
+    "uv run mypy threadsdelete main.py",
+    "uv run ruff check .",
+    "uv run ruff format --check .",
+    "uv run python -m unittest discover -s tests -v",
+    "uv run main.py --help"
+  ],
+  "extraVerify": {
+    "scripts/": [
+      "bash -n scripts/run.sh",
+      {
+        "cmd": "bash -n scripts/refresh-token.sh",
+        "from": "P1-01"
+      }
+    ]
+  },
+  "build": [
+    "uv run python -m compileall -q threadsdelete main.py"
+  ],
+  "baseBranch": "main",
+  "branchPrefix": "build/",
+  "maxRounds": 3,
+  "maxRoundsHard": 6,
+  "flight": "token-refresh",
+  "policies": {
+    "archive": true,
+    "finalize": "ready"
+  },
+  "mutation": {
+    "targeted": {
+      "unit": {
+        "cmd": "uv run python -m unittest {filter} -v"
+      }
+    }
+  },
+  "constraints": [
+    {
+      "id": "no-hardcoded-assumption-defaults",
+      "description": "The SPEC section 5 ASSUMPTION defaults (MAX_DELETIONS_PER_RUN, HTTP_TIMEOUT_SECONDS, MAX_READ_RETRIES, MAX_RETRY_WAIT_SECONDS) are literal numbers only in threadsdelete/config.py. Covers assignment, keyword argument, dict entry, annotated default and getenv-default shapes.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/"
+      ],
+      "exclude": [
+        "threadsdelete/config.py"
+      ],
+      "pattern": "(max_deletions_per_run|http_timeout_seconds|max_read_retries|max_retry_wait_seconds)['\"]?\\s*(?:,\\s*|=\\s*|:\\s*(?:[A-Za-z_][\\w.|\\[\\] ]*=\\s*)?)['\"]?[0-9]",
+      "flags": "i",
+      "shouldMatch": [
+        "MAX_READ_RETRIES = 3",
+        "    \"MAX_DELETIONS_PER_RUN\": 100,",
+        "client = ThreadsClient(max_read_retries=3)",
+        "value = os.environ.get(\"HTTP_TIMEOUT_SECONDS\", \"30\")",
+        "    max_retry_wait_seconds: float = 60.0",
+        "DEFAULT_MAX_DELETIONS_PER_RUN = 100"
+      ],
+      "shouldNotMatch": [
+        "        max_read_retries=config.max_read_retries,",
+        "    max_retry_wait_seconds: float",
+        "    \"MAX_READ_RETRIES\": DEFAULT_MAX_READ_RETRIES,",
+        "        if attempt >= self._max_read_retries:",
+        "ENV_KEYS = (\"DRY_RUN\", \"MAX_DELETIONS_PER_RUN\", \"HTTP_TIMEOUT_SECONDS\")"
+      ]
+    },
+    {
+      "id": "core-is-pure",
+      "description": "threadsdelete/core.py is standard-library-only selection logic: no network, environment, filesystem, logging, clock or sleep (SPEC section 3).",
+      "paths": [
+        "threadsdelete/core.py"
+      ],
+      "pattern": "^\\s*(?:import|from)\\s+(?:os|sys|time|socket|httpx|requests|urllib|pathlib|io|subprocess|shutil|asyncio|threading|logging|random)\\b|\\bopen\\(|\\bsleep\\(|\\bdatetime\\.(?:now|utcnow|today)\\(|\\bdate\\.today\\(|\\bos\\.environ\\b",
+      "shouldMatch": [
+        "import os",
+        "from time import sleep",
+        "import httpx",
+        "import logging",
+        "    now = datetime.now(UTC)",
+        "    with open(path) as fh:"
+      ],
+      "shouldNotMatch": [
+        "from datetime import UTC, datetime, timedelta",
+        "from dataclasses import dataclass, field",
+        "from enum import StrEnum",
+        "    cutoff = run_started_at - timedelta(days=days_ago)"
+      ]
+    },
+    {
+      "id": "no-wall-clock-in-package",
+      "description": "The run-start time is captured once in main.py and passed in; nothing under threadsdelete/ reads the clock (SPEC section 3).",
+      "paths": [
+        "threadsdelete/"
+      ],
+      "pattern": "\\b(?:datetime\\.(?:now|utcnow|today)|date\\.today|time\\.time|time\\.monotonic)\\(",
+      "shouldMatch": [
+        "    started = datetime.now(UTC)",
+        "    started = datetime.datetime.utcnow()",
+        "    t0 = time.time()",
+        "    t0 = time.monotonic()"
+      ],
+      "shouldNotMatch": [
+        "def run(config: Config, client: ThreadsClient, run_started_at: datetime) -> RunSummary:",
+        "    cutoff = compute_cutoff(run_started_at, config.days_ago)"
+      ]
+    },
+    {
+      "id": "no-naive-now",
+      "description": "Never create a timezone-naive current time.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "datetime\\.now\\(\\s*\\)|\\butcnow\\(",
+      "shouldMatch": [
+        "    run_started_at = datetime.now()",
+        "    run_started_at = datetime.datetime.utcnow()"
+      ],
+      "shouldNotMatch": [
+        "    run_started_at = datetime.now(UTC)",
+        "    run_started_at = datetime.now(tz=UTC)"
+      ]
+    },
+    {
+      "id": "httpx-only-in-api",
+      "description": "All HTTP goes through threadsdelete/api.py (SPEC section 4); main.py and other modules use api.Transport and ThreadsClient instead of importing an HTTP library.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/"
+      ],
+      "exclude": [
+        "threadsdelete/api.py"
+      ],
+      "pattern": "^\\s*(?:import|from)\\s+(?:httpx|requests|urllib3|urllib\\.request|http\\.client|aiohttp|socket)\\b|\\burlopen\\(",
+      "shouldMatch": [
+        "import httpx",
+        "from httpx import MockTransport",
+        "import requests",
+        "from urllib.request import urlopen",
+        "from http.client import HTTPSConnection"
+      ],
+      "shouldNotMatch": [
+        "from threadsdelete.api import ThreadsClient, Transport",
+        "from urllib.parse import urlsplit"
+      ]
+    },
+    {
+      "id": "single-http-client",
+      "description": "One maintained HTTP client (httpx); no second HTTP library anywhere in the application.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "^\\s*(?:import|from)\\s+(?:requests|urllib3|urllib\\.request|http\\.client|aiohttp)\\b",
+      "shouldMatch": [
+        "import requests",
+        "from urllib.request import Request",
+        "import aiohttp"
+      ],
+      "shouldNotMatch": [
+        "import httpx",
+        "from urllib.parse import urlsplit"
+      ]
+    },
+    {
+      "id": "sleep-only-in-api",
+      "description": "Only the read-retry loop in threadsdelete/api.py waits, through its injected sleep callable.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "exclude": [
+        "threadsdelete/api.py"
+      ],
+      "pattern": "\\bsleep\\(",
+      "shouldMatch": [
+        "    time.sleep(5)",
+        "    sleep(wait)"
+      ],
+      "shouldNotMatch": [
+        "    client = ThreadsClient(sleep=fake_sleep)",
+        "    sleep: Callable[[float], None]"
+      ]
+    },
+    {
+      "id": "no-token-in-logs",
+      "description": "The access token never reaches print or a logger call (SPEC section 3, redaction).",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "\\b(?:print|(?:logger|logging|log|_log|_logger|LOGGER)\\.(?:debug|info|warning|warn|error|exception|critical|log))\\(.*(?:[^\\w\"']access_token\\b|_access_token\\b|\\[[\"']THREADS_ACCESS_TOKEN[\"']\\])",
+      "shouldMatch": [
+        "    logger.info(\"token=%s\", config.access_token)",
+        "    print(f\"Using {self._access_token}\")",
+        "    logging.debug(\"env %s\", env[\"THREADS_ACCESS_TOKEN\"])",
+        "    logger.debug(\"token %s\", access_token)"
+      ],
+      "shouldNotMatch": [
+        "    logger.info(\"Account verified: %s\", identity.username)",
+        "    headers = {\"Authorization\": f\"Bearer {self._access_token}\"}",
+        "    logging.getLogger().addFilter(RedactingFilter([config.access_token]))",
+        "    logger.error(\"THREADS_ACCESS_TOKEN is required\")"
+      ]
+    },
+    {
+      "id": "no-token-refresh-outside-script",
+      "description": "Only scripts/refresh-token.sh refreshes tokens (token-refresh SPEC sections 6 and 7); the Python package, other scripts and the workflows never call the refresh endpoint.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/",
+        ".github/workflows/"
+      ],
+      "exclude": [
+        "scripts/refresh-token.sh"
+      ],
+      "pattern": "refresh_access_token|th_refresh_token",
+      "shouldMatch": [
+        "    url = f\"{BASE}/refresh_access_token\"",
+        "    params = {\"grant_type\": \"th_refresh_token\"}",
+        "        run: curl -q 'https://graph.threads.com/refresh_access_token?grant_type=th_refresh_token'"
+      ],
+      "shouldNotMatch": [
+        "        run: ./scripts/refresh-token.sh",
+        "  group: refresh-token",
+        "      - name: Refresh token",
+        "    access_token = config.access_token"
+      ]
+    },
+    {
+      "id": "no-app-secret-or-exchange",
+      "description": "No token exchange and no app secret anywhere in code, scripts or workflows (token-refresh SPEC section 3 non-goals); the app secret is used only in the manual steps of docs/META_SETUP.md.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/",
+        ".github/workflows/"
+      ],
+      "pattern": "th_exchange_token|client_secret|APP_SECRET",
+      "shouldMatch": [
+        "    params = {\"grant_type\": \"th_exchange_token\"}",
+        "    secret = env[\"THREADS_APP_SECRET\"]",
+        "    params = {\"client_secret\": secret}",
+        "          THREADS_APP_SECRET: ${{ secrets.THREADS_APP_SECRET }}",
+        "  printf '%s' \"$secret\" | curl -q --get --data-urlencode client_secret@- \"$url\""
+      ],
+      "shouldNotMatch": [
+        "          GH_TOKEN: ${{ secrets.SECRETS_WRITE_TOKEN }}",
+        "          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}",
+        "# Tokens are refreshed by scripts/refresh-token.sh"
+      ]
+    },
+    {
+      "id": "secret-write-only-in-refresh-script",
+      "description": "Only scripts/refresh-token.sh writes a repository secret (gh secret set). Docs and tests are not scanned, since they may name the command.",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/",
+        ".github/workflows/"
+      ],
+      "exclude": [
+        "scripts/refresh-token.sh"
+      ],
+      "pattern": "\\bgh\\b.*\\bsecret\\b\\W{1,6}set\\b",
+      "shouldMatch": [
+        "printf '%s' \"$token\" | gh secret set THREADS_ACCESS_TOKEN",
+        "        run: gh secret set THREADS_ACCESS_TOKEN --body \"$TOKEN\"",
+        "  gh --repo example-owner/threadsdelete secret set THREADS_ACCESS_TOKEN",
+        "    subprocess.run([\"gh\", \"secret\", \"set\", \"THREADS_ACCESS_TOKEN\"], input=token)"
+      ],
+      "shouldNotMatch": [
+        "if ! gh secret list >\"$work/gh-list.out\" 2>&1; then",
+        "        run: ./scripts/refresh-token.sh",
+        "          GH_TOKEN: ${{ secrets.SECRETS_WRITE_TOKEN }}"
+      ]
+    },
+    {
+      "id": "no-shell-trace",
+      "description": "No shell tracing (set -x, set -o xtrace, bash -x, including combined flags such as set -euxo) in scripts or workflows: a trace would print the token (token-refresh SPEC section 4.1).",
+      "paths": [
+        "scripts/",
+        ".github/workflows/"
+      ],
+      "pattern": "\\bset\\s+(?:[-+][A-Za-z]+\\s+)*-[A-Za-z]*x|\\bxtrace\\b|\\bbash\\s+(?:-\\S+\\s+)*-[A-Za-z]*x",
+      "shouldMatch": [
+        "set -x",
+        "set -euxo pipefail",
+        "set -e -x",
+        "  set -xv",
+        "set -o xtrace",
+        "#!/bin/bash -x",
+        "        shell: bash -x {0}",
+        "bash --noprofile --norc -eux scripts/refresh-token.sh"
+      ],
+      "shouldNotMatch": [
+        "set -euo pipefail",
+        "set +x",
+        "if [ -x \"$file\" ]; then",
+        "chmod +x scripts/refresh-token.sh",
+        "bash -n scripts/refresh-token.sh",
+        "curl -q -X GET \"$url\"",
+        "printf '%s' \"$token\" | gh secret set THREADS_ACCESS_TOKEN",
+        "        shell: bash"
+      ]
+    },
+    {
+      "id": "no-post-body-field",
+      "description": "Discovery never requests the post body (text) field, so post bodies are never held or logged (SPEC section 3).",
+      "paths": [
+        "threadsdelete/"
+      ],
+      "pattern": "[\"',]\\s*text\\s*[\"',]",
+      "shouldMatch": [
+        "FIELDS = \"id,text,timestamp\"",
+        "FIELDS = (\"id\", \"text\", \"timestamp\")",
+        "    params = {\"fields\": \"id,timestamp,text\"}"
+      ],
+      "shouldNotMatch": [
+        "    body = response.text",
+        "    headers = {\"Content-Type\": \"text/plain\"}",
+        "FIELDS = \"id,timestamp,permalink,media_type\""
+      ]
+    },
+    {
+      "id": "no-url-outside-api",
+      "description": "In the Python package, URL literals (and therefore hosts) live only in threadsdelete/api.py, which keeps credential-bearing requests on the trusted API host. Under scripts/, only scripts/refresh-token.sh may contain URLs: the two graph.threads.com URLs of SPEC 4.1 (refresh_access_token and v1.0/me).",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "scripts/"
+      ],
+      "exclude": [
+        "threadsdelete/api.py",
+        "scripts/refresh-token.sh"
+      ],
+      "pattern": "https?://",
+      "shouldMatch": [
+        "BASE = \"https://graph.threads.net/v1.0\"",
+        "    url = \"http://localhost:8080\"",
+        "  url='https://graph.threads.com/v1.0/me?fields=id'"
+      ],
+      "shouldNotMatch": [
+        "    print(\"See README.md for setup\")",
+        "    link = candidate.permalink",
+        "cd \"$(dirname \"$0\")/..\""
+      ]
+    },
+    {
+      "id": "no-redirects-or-insecure-tls",
+      "description": "The HTTP client never follows redirects (credentials stay on the API host) and never disables TLS verification.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "follow_redirects\\s*=\\s*True|verify\\s*=\\s*False",
+      "shouldMatch": [
+        "    httpx.Client(follow_redirects=True)",
+        "    httpx.Client(verify=False)"
+      ],
+      "shouldNotMatch": [
+        "    httpx.Client(follow_redirects=False, timeout=timeout, transport=transport)"
+      ]
+    },
+    {
+      "id": "no-environ-in-package",
+      "description": "Only main.py reads the process environment; threadsdelete/config.py parses a Mapping passed to it.",
+      "paths": [
+        "threadsdelete/"
+      ],
+      "pattern": "\\bos\\.(?:environ|getenv)\\b|^\\s*from\\s+os\\s+import\\s+.*\\b(?:environ|getenv)\\b",
+      "shouldMatch": [
+        "    token = os.environ[\"THREADS_ACCESS_TOKEN\"]",
+        "    value = os.getenv(\"DRY_RUN\")",
+        "from os import environ"
+      ],
+      "shouldNotMatch": [
+        "    config = load_config(env)",
+        "def load_config(env: Mapping[str, str]) -> Config:"
+      ]
+    },
+    {
+      "id": "tests-no-real-transport",
+      "description": "Tests are offline: they use httpx.MockTransport through tests/fakes.py, never a real transport or urlopen.",
+      "paths": [
+        "tests/"
+      ],
+      "pattern": "httpx\\.(?:HTTPTransport|AsyncHTTPTransport)\\(|\\burlopen\\(",
+      "shouldMatch": [
+        "    transport = httpx.HTTPTransport()",
+        "    urllib.request.urlopen(url)"
+      ],
+      "shouldNotMatch": [
+        "    transport = httpx.MockTransport(handler)"
+      ]
+    },
+    {
+      "id": "actions-pinned-sha",
+      "description": "Every workflow action is pinned to a full 40-character commit SHA (SPEC section 6, GitHub Actions).",
+      "paths": [
+        ".github/workflows/"
+      ],
+      "pattern": "^\\s*(?:-\\s*)?uses:\\s*['\"]?[^\\s'\"@]+@(?![0-9a-f]{40}(?:['\"\\s]|$))",
+      "shouldMatch": [
+        "      - uses: actions/checkout@v5",
+        "        uses: astral-sh/setup-uv@main",
+        "      - uses: actions/checkout@08c6903"
+      ],
+      "shouldNotMatch": [
+        "      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0",
+        "      - uses: ./.github/actions/local"
+      ]
+    },
+    {
+      "id": "cleanup-no-cancel-in-progress",
+      "description": "The cleanup workflow serializes runs with cancel-in-progress: false (SPEC section 6).",
+      "paths": [
+        ".github/workflows/cleanup-feed.yml"
+      ],
+      "pattern": "cancel-in-progress:\\s*true",
+      "shouldMatch": [
+        "  cancel-in-progress: true"
+      ],
+      "shouldNotMatch": [
+        "  cancel-in-progress: false"
+      ]
+    },
+    {
+      "id": "no-expression-in-run",
+      "description": "Settings reach shell steps through env mappings, never ${{ }} interpolated into run code (original SPEC section 6). A line containing ${{ must be a YAML key mapping whose key is not run (e.g. KEY: ${{ ... }}, if: ${{ ... }}, group: ci-${{ github.ref }}); a run: line or a bare shell line with ${{ is a hit. A key-looking line inside a multi-line run: | block is not caught: reviewer checks by reading.",
+      "paths": [
+        ".github/workflows/"
+      ],
+      "pattern": "^(?!\\s*(?:-\\s*)?(?!run:)[A-Za-z_][\\w-]*:\\s).*\\$\\{\\{",
+      "shouldMatch": [
+        "        run: echo \"${{ vars.DAYS_AGO }}\"",
+        "          uv run main.py --days ${{ inputs.days }}",
+        "      - run: echo ${{ secrets.THREADS_ACCESS_TOKEN }}",
+        "          echo \"days=${{ vars.DAYS_AGO }}\" >> \"$GITHUB_OUTPUT\""
+      ],
+      "shouldNotMatch": [
+        "          DAYS_AGO: ${{ vars.DAYS_AGO }}",
+        "          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}",
+        "    if: ${{ always() }}",
+        "          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || vars.DRY_RUN }}",
+        "        run: uv run main.py",
+        "  group: ci-${{ github.ref }}"
+      ]
+    },
+    {
+      "id": "no-secrets-in-ci",
+      "description": "Offline CI never receives cleanup credentials (SPEC section 6).",
+      "paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "pattern": "\\bsecrets\\.",
+      "shouldMatch": [
+        "          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}"
+      ],
+      "shouldNotMatch": [
+        "          DRY_RUN: \"true\""
+      ]
+    },
+    {
+      "id": "no-pull-request-target",
+      "description": "No workflow uses pull_request_target, which would expose secrets to pull-request code.",
+      "paths": [
+        ".github/workflows/"
+      ],
+      "pattern": "\\bpull_request_target\\b",
+      "shouldMatch": [
+        "  pull_request_target:",
+        "on: [push, pull_request_target]"
+      ],
+      "shouldNotMatch": [
+        "  pull_request:"
+      ]
+    },
+    {
+      "id": "no-reposted-post-id",
+      "description": "Reposts are removed by the repost record's own id only; the package never requests or reads reposted_post (SPEC section 4, Removal). Not even in a comment or docstring.",
+      "paths": [
+        "threadsdelete/",
+        "main.py"
+      ],
+      "pattern": "reposted_post",
+      "shouldMatch": [
+        "_THREADS_FIELDS = \"id,timestamp,permalink,owner,media_type,is_quote_post,reposted_post\"",
+        "    original = record.get(\"reposted_post\")",
+        "    target_id = record[\"reposted_post\"][\"id\"]"
+      ],
+      "shouldNotMatch": [
+        "    target_id = record[\"id\"]",
+        "_REPOST_TYPE = \"REPOST_FACADE\"",
+        "_THREADS_FIELDS = \"id,timestamp,permalink,owner,media_type,is_quote_post\""
+      ]
+    },
+    {
+      "id": "no-unrepost-operation",
+      "description": "Operation.UNREPOST is removed; reposts map to Operation.DELETE (SPEC section 4, Quota).",
+      "paths": [
+        "threadsdelete/",
+        "main.py",
+        "tests/"
+      ],
+      "pattern": "\\bUNREPOST\\b|[\"']unrepost[\"']",
+      "shouldMatch": [
+        "    UNREPOST = \"unrepost\"",
+        "    Category.REPOST: Operation.UNREPOST,",
+        "        self.assertEqual(candidate.operation, \"unrepost\")"
+      ],
+      "shouldNotMatch": [
+        "    Category.REPOST: Operation.DELETE,",
+        "    UNLIKE = \"unlike\"",
+        "class Category(StrEnum):"
+      ]
+    },
+    {
+      "id": "curl-q-first",
+      "description": "Every curl call in scripts/ starts with -q as its first argument, on the same line as curl, so a user .curlrc cannot turn on verbose output or redirects (token-refresh SPEC section 4.1). Flags curl in command position (line start, after | ; & ( ! $( then do else exec command time) when -q does not follow.",
+      "paths": [
+        "scripts/"
+      ],
+      "pattern": "(?:^|[|;&(!]|\\$\\(|\\b(?:then|do|else|exec|command|time))\\s*curl\\b(?!\\s+-q(?:\\s|$))",
+      "shouldMatch": [
+        "  status=$(printf '%s' \"$token\" | curl --silent --get \"$url\")",
+        "curl -sS https://example.invalid/",
+        "if ! out=$(curl --max-time 30 -q \"$url\"); then",
+        "  | curl -s -q \\",
+        "  status=$(curl)"
+      ],
+      "shouldNotMatch": [
+        "  status=$(printf '%s' \"$token\" | curl -q --silent --show-error --max-time 30 \\",
+        "status=$(curl -q --get \"$url\")",
+        "if ! command -v curl >/dev/null 2>&1; then",
+        "for tool in curl jq; do",
+        "# Every curl call starts with -q so a .curlrc cannot change it."
+      ]
+    },
+    {
+      "id": "no-curl-redirects",
+      "description": "No redirect following in scripts/: no -L (alone or combined, e.g. -sSL), --location or --location-trusted (token-refresh SPEC section 4.1). The flag is banned anywhere in scripts/, not only on curl lines.",
+      "paths": [
+        "scripts/"
+      ],
+      "pattern": "(?:^|\\s)(?:-[A-Za-z]*L[A-Za-z]*|--location(?:-trusted)?)(?=\\s|$)",
+      "shouldMatch": [
+        "curl -q -L \"$url\"",
+        "curl -q -sSL \"$url\"",
+        "  --location \\",
+        "curl -q --location-trusted \"$url\""
+      ],
+      "shouldNotMatch": [
+        "  status=$(printf '%s' \"$token\" | curl -q --silent --show-error --max-time 30 \\",
+        "    --output \"$work/refresh.json\" --write-out '%{http_code}' \\",
+        "    --get --data-urlencode 'access_token@-' \\",
+        "cd \"$(dirname \"$0\")/..\"",
+        "exec uv run --env-file .env main.py \"$@\""
+      ]
+    },
+    {
+      "id": "no-secret-body-flag",
+      "description": "The new token reaches gh secret set on stdin only, never through --body or -b (token-refresh SPEC section 4.1, step 6).",
+      "paths": [
+        "scripts/",
+        ".github/workflows/"
+      ],
+      "pattern": "(?:^|\\s)--body(?:[=\\s]|$)|\\bsecret\\b\\W{1,6}set\\b.*\\s-b(?:\\s|$)",
+      "shouldMatch": [
+        "gh secret set THREADS_ACCESS_TOKEN --body \"$token\"",
+        "gh secret set THREADS_ACCESS_TOKEN -b \"$token\"",
+        "    --body=\"$token\" \\"
+      ],
+      "shouldNotMatch": [
+        "printf '%s' \"$new_token\" | gh secret set THREADS_ACCESS_TOKEN",
+        "if ! gh secret list >\"$work/gh-list.out\" 2>&1; then",
+        "  status=$(printf '%s' \"$token\" | curl -q --silent --show-error --max-time 30 \\"
+      ]
+    },
+    {
+      "id": "no-awk-v",
+      "description": "awk in scripts/ never takes values through -v (an argument any process can read); pass the token through the environment and read it with ENVIRON (token-refresh SPEC section 4.1).",
+      "paths": [
+        "scripts/"
+      ],
+      "pattern": "\\b[gm]?awk\\b.*\\s-v(?:\\s|\\S*=)",
+      "shouldMatch": [
+        "awk -v token=\"$new_token\" '/^THREADS_ACCESS_TOKEN=/ { print }' .env",
+        "  awk -vtoken=\"$new_token\" '{ print }' .env",
+        "  gawk -v t=\"$x\" '{ print t }' .env"
+      ],
+      "shouldNotMatch": [
+        "NEW_TOKEN=\"$new_token\" awk '/^THREADS_ACCESS_TOKEN=/ { print \"THREADS_ACCESS_TOKEN=\" ENVIRON[\"NEW_TOKEN\"]; next } { print }' .env >\"$tmp_env\"",
+        "if ! command -v jq >/dev/null 2>&1; then"
+      ]
+    },
+    {
+      "id": "no-token-in-url-args",
+      "description": "No access_token=<expanded variable> in a URL query (?access_token=, &access_token=) or a --data/--data-urlencode/--data-raw/-d argument in scripts/; the token reaches curl only on stdin through --data-urlencode 'access_token@-' (token-refresh SPEC section 4.1).",
+      "paths": [
+        "scripts/"
+      ],
+      "pattern": "(?:[?&]|--data(?:-urlencode|-raw)?\\s+[\"']?|-d\\s+[\"']?)access_token=[\"'{]*\\$",
+      "shouldMatch": [
+        "curl -q --get --data-urlencode \"access_token=$token\" \"$url\"",
+        "url=\"https://graph.threads.com/v1.0/me?fields=id&access_token=${token}\"",
+        "  --data 'access_token='\"$token\" \\"
+      ],
+      "shouldNotMatch": [
+        "    --get --data-urlencode 'access_token@-' \\",
+        "    'https://graph.threads.com/refresh_access_token?grant_type=th_refresh_token'",
+        "  printf 'THREADS_ACCESS_TOKEN=%s\\n' \"$x\"",
+        "  old_access_token=$(sed -n 's/^THREADS_ACCESS_TOKEN=//p' .env)",
+        "  access_token=$(cat \"$work/token\")"
+      ]
+    }
+  ]
+}
