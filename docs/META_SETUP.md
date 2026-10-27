@@ -1,6 +1,6 @@
 # Meta setup and token maintenance
 
-Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23). In step 8, the local refresh (`./scripts/refresh-token.sh`) was live-verified on 2026-10-27; the automatic refresh in Actions is not yet live-verified.
+Steps 1 to 7 were verified on the owner's account on 2026-10-24. Steps 8 and 9 come from Meta's documentation (2026-10-23). The local refresh in step 8 was live-verified on 2026-10-27; the Actions refresh is not yet.
 
 Commands use placeholders. Never put real IDs, secrets or tokens in docs, issues or commits. Sources and unknowns: [RESEARCH.md](RESEARCH.md).
 
@@ -85,20 +85,20 @@ The tool compares this to `THREADS_USER_ID` on every run and refuses to continue
 ## 8. Expiry and refresh
 
 - Long-lived tokens last 60 days. A token can be refreshed once it is at least 24 hours old and not yet expired; a token that has not been refreshed within 60 days expires for good.
-- Automatic refresh in Actions is the default. The "Refresh token" workflow (`.github/workflows/refresh-token.yml`) runs `scripts/refresh-token.sh` on the 1st and 15th of each month at 06:17 UTC (cron `17 6 1,15 * *`) and on manual dispatch. Two runs a month leave room for one dropped scheduled run (GitHub can skip scheduled runs under load, often without a notification) before the 60-day expiry. It refreshes the token, checks that the new token belongs to your account, and saves it to the `THREADS_ACCESS_TOKEN` repository secret.
+- Automatic refresh in Actions is the default. The "Refresh token" workflow (`.github/workflows/refresh-token.yml`) runs `scripts/refresh-token.sh` on the 1st and 15th of each month at 06:17 UTC (cron `17 6 1,15 * *`) and on manual dispatch. Two runs a month survive one skipped scheduled run. It refreshes the token, checks that the new token belongs to your account, and saves it to the `THREADS_ACCESS_TOKEN` repository secret.
 - PAT setup: `GITHUB_TOKEN` cannot write repository secrets, so create a fine-grained personal access token limited to this repository with the repository permission "Secrets: read and write" and an expiry of at most 1 year (calendar the renewal). Save it as the repository secret `SECRETS_WRITE_TOKEN`. The PAT is a second credential that expires and is renewed by hand.
 - Failure alerts: in GitHub's notification settings, turn on Actions notifications (failed workflows only is enough). Scheduled-run alerts go to whoever created the workflow, last changed its cron line, or last re-enabled it.
 - The first manual dispatch needs a current token at least 24 hours old. Check that it worked from the run log's "Token refreshed and saved to the repository secret" line and the update time of `THREADS_ACCESS_TOKEN` in `gh secret list`.
-- After a failure, read the script's message. If it says "Nothing was changed" (exit 2), the problem was found before the refresh request: fix the named cause, then run again. If it says the token's state "may have changed" (exit 1), it failed during or after the request: check the stored token with a cleanup preview (`DRY_RUN=true ./scripts/run.sh` locally, or the cleanup workflow with dry_run true). If that fails authentication, get a new token via step 5 and save it in the destination that failed (step 7); a new token cannot be refreshed until it is 24 hours old.
+- After a failure, read the script's message. If it says "Nothing was changed" (exit 2), the problem was found before the refresh request: fix the named cause, then run again. If it says the token's state "may have changed" (exit 1), it failed during or after the request: check the stored token with a cleanup preview (`DRY_RUN=true ./scripts/run.sh` locally, or the cleanup workflow with dry_run true). If that fails authentication, save a new token from step 5 where it failed (step 7).
 - Local refresh: run `./scripts/refresh-token.sh`. It needs `curl` and `jq` and rewrites only the `THREADS_ACCESS_TOKEN=` line of the repository's `.env`. To refresh the repository secret, run the workflow instead.
-- Shared versus separate tokens: a refresh returns a new token string, and the old one kept working right afterwards (RESEARCH: Live observations, 2026-10-27). How long it keeps working is untested, so refresh a shared token in only one place, or give the local `.env` its own token by repeating step 5.
+- Shared versus separate tokens: a refresh returns a new token, and the old one keeps working for an untested time (RESEARCH: Untested and pending). Refresh a shared token in only one place, or give the local `.env` its own token by repeating step 5.
 - Manual fallback:
 
 ```
 curl "https://graph.threads.com/refresh_access_token?grant_type=th_refresh_token&access_token=<LONG_LIVED_TOKEN>"
 ```
 
-- Replace the old value with the new `access_token` only where that token came from: the local `.env`, or the GitHub Secret (Settings, Secrets and variables, Actions, edit `THREADS_ACCESS_TOKEN`). If both share one token, update both.
+- Replace the old value with the new `access_token` wherever that token is stored: the local `.env`, the GitHub Secret (Settings, Secrets and variables, Actions, edit `THREADS_ACCESS_TOKEN`), or both if they share it.
 - If the token already expired, repeat steps 5a to 5c.
 - Permission grants themselves last 90 days; refreshing a public-profile token extends the grant, but for a private profile the grant cannot be extended and you must authorize again (step 5a).
 - When the token has expired, scheduled runs fail with exit status 3 until you replace it.

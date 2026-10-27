@@ -210,11 +210,11 @@ The original research (2026-10-23) used no credentials. Live checks on the owner
 - The owner completed `docs/META_SETUP.md` steps 1 to 7. The resulting token could delete, so `threads_delete` was granted (enabled under the Threads use case's "Permissions and features" in the App Dashboard), and it worked through the `access_token` query parameter.
 - `GET /me?fields=id,username` returned exactly `id` and `username`.
 - `GET /me/threads` paginated with `paging.next` and returned content created in the Threads app, including text posts and reposts several years old. `GET /me/replies` returned replies created in the app, all with `is_reply_owned_by_me: true`.
-- 2026-10-27: a local `./scripts/refresh-token.sh` run on the owner's `.env` token succeeded and returned a different token string. Right afterwards, `GET /me?fields=id` returned 200 with the owner's ID for both the old and the new token, so a refresh does not immediately revoke the old token.
+- 2026-10-27: a local `./scripts/refresh-token.sh` run on the owner's `.env` token returned a different token string. Right afterwards, `GET /me?fields=id` returned the owner's ID for both the old and the new token.
 
 ## Untested and pending
 
-- How long the old token stays valid after a refresh (until its original 60-day expiry, or less), and whether it can still be refreshed itself. It did not stop working right away (Live observations, 2026-10-27).
+- How long the old token stays valid after a refresh, and whether it can still be refreshed.
 - Which error code and HTTP status the 100-per-day deletion limit raises.
 - Ghost posts: whether `/me/threads` returns them (they have a separate `ghost_posts` edge not used here).
 - Any Meta platform-terms constraint on automated personal cleanup.
