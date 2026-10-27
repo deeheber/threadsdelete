@@ -134,7 +134,7 @@ def _check_quota(
         )
     remaining: dict[Operation, int | None] = dict(quota.remaining)
     detail = ", ".join(f"{op}: {n} remaining" for op, n in quota.remaining.items())
-    return remaining, f"Quota: available ({detail}, {quota.window_description})"
+    return remaining, f"Quota at start: available ({detail}, {quota.window_description})"
 
 
 def _remove_all(
