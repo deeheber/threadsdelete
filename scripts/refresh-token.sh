@@ -82,7 +82,7 @@ fi
 
 # error_code FILE KEY: print a digits-only error code, or nothing.
 error_code() {
-  jq -r "(if (.error|type)==\"object\" then .error.$2 else .$2 end) | tostring | select(test(\"^[0-9]+$\"))" "$1" 2>/dev/null || true
+  jq -r "(if (.error|type)==\"object\" then .error.$2 else .$2 end) | select(type==\"number\") | tostring | select(test(\"^[0-9]+$\"))" "$1" 2>/dev/null || true
 }
 
 # Step 3: refresh, once, never retried.

@@ -394,6 +394,7 @@ class BothDestinationTests(Harness):
             {"error": {"message": leak, "error_user_msg": leak, "code": 190}},
             {"error": {"code": 190, "error_subcode": "FAKE-LEAK-TOKEN-eeee5555"}},
             {"error": {"code": 190, "error_subcode": -1}},
+            {"error": {"code": 190, "error_subcode": "123456"}},
             {"error": {"code": 190, "error_subcode": 2.5}},
         ]
         for mode in MODES:
