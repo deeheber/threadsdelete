@@ -8,7 +8,7 @@ Started: 2026-10-27T01:39:46.742Z
 - [x] P1-01 Refresh script with the local .env destination
 - [x] P1-02 Actions destination for the refresh script
 - [x] P1-03 Monthly refresh workflow
-- [ ] P1-04 Setup guide and research notes for automatic refresh
+- [x] P1-04 Setup guide and research notes for automatic refresh
 - [ ] P1-05 README and .env.sample for token refresh
 - [ ] P1-06 Phase 1 close — push and manual checks
 
@@ -27,3 +27,7 @@ Actions mode implemented in scripts/refresh-token.sh (inputs validated via eval 
 ### P1-03 — 9f5abfe
 
 Added .github/workflows/refresh-token.yml (exact content from task) and tests: RefreshWorkflowTests (4), SharedWorkflowTests now loop over ALL workflows (pinning, no expressions in run, no pull_request_target, coverage). ci.yml/cleanup-feed.yml untouched. Manual check: NOT VERIFIED (human).
+
+### P1-04 — 170eb2e
+
+Rewrote META_SETUP section 8 ("Expiry and refresh"), intro line, README anchor, and RESEARCH edits (six items). Docs only. Note: the task's grep for the old anchor over docs/*.md still hits docs/PLAN.md (it quotes it); README and META_SETUP are clean. Manual check: NOT VERIFIED (human).
