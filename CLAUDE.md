@@ -1,7 +1,5 @@
 # threadsdelete
 
-Personal Threads cleanup tool using Meta's official API, locally or weekly through GitHub Actions.
-
 Behavior: `docs/SPEC.md` overrides the original `docs/flights/threadsdelete/SPEC.md`; both override `docs/PLAN.md` during a flight, then code comments. "SPEC section N" means the original spec. API facts: `docs/RESEARCH.md` § Contracts overrides SPEC; SPEC wins on behavior.
 
 Configuration is the five settings in README § Settings. Log level, API version, timeout and retry values are internal constants in `threadsdelete/config.py`. This overrides SPEC section 5 and the `LOG_LEVEL` rule in section 2 (issue #6).
@@ -10,14 +8,13 @@ Other flight files are archived decision history, except the current constraint 
 
 ## Principles
 
-- [ ] Ruff lint + format and mypy (`strict`, untyped defs rejected) pass; every function in `threadsdelete/` and `main.py` is annotated.
 - [ ] Documented Meta endpoints at an explicit API version; no scraping or unofficial APIs.
 - [ ] Validate all configuration before any network activity. Booleans: case-insensitive `true`/`false` only; missing `DRY_RUN` → true.
 - [ ] One UTC run-start time; eligible iff `action_at <= run_started_at - timedelta(days=DAYS_AGO)`. Posts/replies use creation time; likes/reposts use the owner's action time.
 - [ ] Complete discovery and validation before any mutation; never mutate while paginating; dedupe by (operation, ID); sort by action time, category, ID.
 - [ ] Abort mutation on incomplete discovery or ambiguous ownership; never touch another person's content.
-- [ ] Dry run makes no mutation (any non-GET) and no token refresh.
-- [ ] The Python package never refreshes tokens; only `scripts/refresh-token.sh` does. It checks the new token before saving it, never retries the refresh, and prints no token except the Actions `::add-mask::` line.
+- [ ] Dry run builds `ThreadsClient(read_only=True)`; it makes no mutation (any non-GET) and no token refresh.
+- [ ] The Python package never refreshes tokens; only `scripts/refresh-token.sh` does. It sends the refresh once (never retried), prints the Actions `::add-mask::` line before any other use of the new token, verifies it (`/me` id) before saving, writes only the `THREADS_ACCESS_TOKEN` line of `.env`, and prints nothing from a response body except the HTTP status and integer error codes. No token in any process argument or other output.
 - [ ] Remove sequentially within the per-run cap and verified quota; report deferred work. Never retry a destructive request; unknown outcome is never success.
 - [ ] Redact credentials everywhere; never fetch or log post bodies; never commit `.env`, tokens or real account data.
 - [ ] Offline, behavior-focused tests; no coverage targets, getter tests, or formatting snapshots.
@@ -25,17 +22,12 @@ Other flight files are archived decision history, except the current constraint 
 
 ## Commands
 
+CI (`.github/workflows/ci.yml`) runs the install, typecheck, lint, format, test, compile and `--help` checks; run the same locally. Also:
+
 | Purpose | Command |
 | --- | --- |
-| Install | `uv sync --locked` |
 | Lockfile check | `uv lock --check` |
-| Typecheck | `uv run mypy threadsdelete main.py` |
-| Lint | `uv run ruff check .` |
-| Format check | `uv run ruff format --check .` |
-| Tests (offline) | `uv run python -m unittest discover -s tests -v` |
 | One test module/class | `uv run python -m unittest tests.test_core -v` |
-| Syntax check (build) | `uv run python -m compileall -q threadsdelete main.py` |
-| Help smoke | `uv run main.py --help` |
 | Refresh script syntax | `bash -n scripts/refresh-token.sh` |
 | Budget measurements | `uv run python -c "from tests.test_budgets import report; report()"` |
 
@@ -81,18 +73,13 @@ Current rules: `constraints` in `docs/flights/token-refresh/kukulu.json`. The ne
 
 Checks by reading (no line pattern catches these):
 
-- Dry run constructs `ThreadsClient(read_only=True)`; no code path mutates in dry run.
-- All discovery for all supported categories finishes before the first `remove` call.
-- `remove` is called at most once per candidate per run; no retry wrapper around it.
 - `scripts/run.sh` contains no cleanup logic; exit status is preserved (`exec`, `pipefail`).
 - No `${{ }}` expression inside a multi-line `run: |` block (the `no-expression-in-run` pattern flags `run:` lines and bare shell lines, allows any other `key: ...${{ }}` mapping such as `group: ci-${{ github.ref }}`, and cannot see block context).
-- Test fixtures are synthetic; `.env`, tokens and real account data are never committed.
 - If any Bluesky source is adapted, its MIT notice is retained.
-- `scripts/refresh-token.sh`: no token in any process argument or output except the Actions `::add-mask::` line; the mask is printed before any other use of the new token; the new token is verified (`/me` id) before saving; the refresh request is sent once, never retried; only this script writes `.env`, and only its `THREADS_ACCESS_TOKEN` line; nothing is printed from a response body except the HTTP status and integer error codes.
 
 ## Conventions
 
 - **Tests:** use `tests.fakes.FakeThreadsApi` (an `httpx.MockTransport`), imported as `from tests.fakes import ...` so `tests/__init__.py`'s socket guard loads. Fixtures use fake IDs and usernames like `example_owner`.
-- **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and matching README text; update `.env.sample` too when changing a user setting. Timeout and retry values are internal constants; live measurements are still pending.
+- **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and matching README text; update `.env.sample` too when changing a user setting. Live timeout and retry measurements are still pending.
 - **Pinned actions:** pin every `uses:` to a full 40-character commit SHA with the version in a trailing comment (`# v5.0.0`). Get it from `git ls-remote --tags https://github.com/<owner>/<repo>` (the peeled `^{}` SHA of the latest stable tag). Never guess a SHA.
 - **Kūkulu policies:** every flight sets `policies.archive` to `true` and `policies.finalize` to `"ready"` in `docs/kukulu.json`, unless that flight's spec says otherwise.
