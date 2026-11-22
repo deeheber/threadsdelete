@@ -80,6 +80,6 @@ Checks by reading (no line pattern catches these):
 ## Conventions
 
 - **Tests:** use `tests.fakes.FakeThreadsApi` (an `httpx.MockTransport`), imported as `from tests.fakes import ...` so `tests/__init__.py`'s socket guard loads. Fixtures use fake IDs and usernames like `example_owner`.
-- **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and matching README text; update `.env.sample` too when changing a user setting. Live timeout and retry measurements are still pending.
+- **ASSUMPTION defaults:** change one only with a measurement (`report()` above) and matching README text; update `.env.sample` too when changing a user setting.
 - **Pinned actions:** pin every `uses:` to a full 40-character commit SHA with the version in a trailing comment (`# v5.0.0`). Get it from `git ls-remote --tags https://github.com/<owner>/<repo>` (the peeled `^{}` SHA of the latest stable tag). Never guess a SHA.
 - **Kūkulu policies:** every flight sets `policies.archive` to `true` and `policies.finalize` to `"ready"` in `docs/kukulu.json`, unless that flight's spec says otherwise.
